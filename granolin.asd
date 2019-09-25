@@ -8,4 +8,5 @@
   :serial t
   :depends-on (#:drakma #:jonathan)
   :components ((:file "package")
-               (:file "granolin")))
+               (:file "granolin")
+               (:file "utility-apps")))

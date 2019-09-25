@@ -22,6 +22,9 @@
     :initarg :homeserver
     :initform (error "HOMESERVER is required.")
     :type string)
+   (running-p
+    :accessor running-p
+    :initform t)
    (timeout
     :accessor timeout
     :initarg :timeout
@@ -172,15 +175,15 @@
 
   `(multiple-value-bind
        (*response-body* *response-status* *response-headers*)
-       (drakma:http-request (make-matrix-url ,client ,path)
+       (drakma:http-request (make-matrix-path ,client ,path)
                             :additional-headers (add-auth-header ,client ,headers)
                             :method ,method
-                            :body (jonathan:to-json ,body)
+                            :content (jonathan:to-json ,body)
                             :content-type "application/json")
      (if (= 200 *response-status*)
          (let ((*response-object*
                  (,wrap
-                  :data (jonathan:parse *response-body*))))
+                  :data (jonathan:parse (flexi-streams:octets-to-string *response-body*)))))
            ,on-ok)
          ,otherwise)))
 
@@ -199,14 +202,14 @@
   run."
   `(multiple-value-bind
          (*response-body* *response-status* *response-headers*)
-         (drakma:http-request (make-matrix-url ,client ,path)
+         (drakma:http-request (make-matrix-path ,client ,path)
                               :additional-headers (add-auth-header ,client ,headers)
                               :parameters ,params
                               :method :get)
      (if (= 200 *response-status*)
          (let ((*response-object*
                  (,wrap
-                  :data (jonathan:parse *response-body*))))
+                  :data (jonathan:parse (flexi-streams:octets-to-string *response-body*)))))
            ,on-ok)
          ,otherwise)))
 
@@ -249,13 +252,13 @@
   "
   (let (params)
     (push (cons "full_state" full-state) params)
-    (push (cons "timeout" (timeout client)) params)
+    (push (cons "timeout" (format nil "~a" (timeout client))) params)
     (when (next-batch client)
       (push (cons "since" (next-batch client))  params))
 
     (fetch (client +sync-path+ :params params :wrap make-sync-response)
            (handle-sync-response client)
-           (error "Matrix returned ~a from ~a~"
+           (error "Matrix returned ~a from ~a"
                   *response-status* +sync-path+))))
 
 (defun handle-sync-response (client)
@@ -284,4 +287,14 @@
         (setf (invitation-event-data invite-event) ob)
         (handle-invitation-event client room-id invite-event)))))
 
+
+;;; bot loop
+
+(defun start (client)
+  (setf (running-p client) t)
+  (loop :while (running-p client)
+        :do (sync client)))
+
+(defun stop (client)
+  (setf (running-p client) nil))
 

@@ -119,6 +119,7 @@
 
 (def-json-wrap room-state-event
   (event-content :|content|)
+  (sender :|sender|)
   (event-type :|type|)
   (event-id :|event_id|)
   (state-key :|state_key|)
@@ -267,18 +268,18 @@
       ;; handle the timeline events (aka room events)
       (dolist (ob (getob room :|timeline| :|events|))
         (setf (timeline-event-data message-event) ob)
-        (handle-timeline-event client room-id message-event))
+        (handle-event client room-id message-event))
       ;; handle state chnage events (aka state events)
       (dolist (ob (getob room :|state| :|events|))
         (setf (room-state-event-data state-event) ob)
-        (handle-room-state-event client room-id state-event)))))
+        (handle-event client room-id state-event)))))
 
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
     (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
       (dolist (ob (getob room :|invite_state| :|events|))
         (setf (invitation-event-data invite-event) ob)
-        (handle-invitation-event client room-id invite-event)))))
+        (handle-event client room-id invite-event)))))
 
 
 ;;; bot loop

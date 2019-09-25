@@ -41,6 +41,26 @@
     :type string
     :documentation "Used on sync requests as the value of the SINCE parameter")))
 
+(defun save-client-state (client &key (fname "granolin.conf"))
+  "Save a PLIST of client state to disk. Saves HOMESERVER, TIMEOUT,
+   ACCESS-TOKEN, and NEXT-BATCH values to the file."
+
+  (with-open-file (out fname :direction :output)
+    (print (list :homeserver (homeserver client)
+                 :timeout (timeout client)
+                 :access-token (access-token client)
+                 :next-batch (next-batch client))
+           out)))
+
+(defun load-client-state (client &optional (fname "granolin.conf"))
+  "Load client state from a PLIST stored in a file."
+  (let ((conf (with-open-file (in fname) (read in))))
+    (setf (homeserver client) (getf conf :homeserver))
+    (setf (timeout client) (getf conf :timeout))
+    (setf (access-token client) (getf conf :access-token))
+    (setf (next-batch client) (getf conf :next-batch)))
+  client)
+
 ;; TODO
 (defun validate-homserver-url (client)
   "Ensure that the homeserver url is well formed, and makes an attempt to format it if it isnt")

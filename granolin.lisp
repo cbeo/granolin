@@ -48,18 +48,14 @@
 (defmethod initialize-instance :after ((client client) &key)
   (validate-homserver-url client))
 
-(defgeneric handle-timeline-event (client room event)
-  (:documentation "Implemented on handlers that need to respond to timeline events.")
+(defgeneric handle-event (client room event)
+  (:documentation "Implemented on handlers that need to respond to events.")
   (:method ((client client) room event) t))
 
-(defgeneric handle-room-state-event (client room event)
-  (:documentation "Implemented on handlers that need to respond to room state change events.")
-  (:method ((client client) room event) t))
-
-(defgeneric handle-invitation-event (client room event)
-  (:documentation "Implemented on handlers that need to respond to room invitations.")
-  (:method ((client client) room event) t))
-
+(defgeneric clean-up (client)
+  (:documentation "To be run before the client crashes or is killed.")
+  (:method ((client client))
+    (setf (running-p client) nil)))
 
 ;;; Dynamic variables bound during response handling. Each such variable should
 ;;; be bound to a value during any message handler call.
@@ -134,7 +130,6 @@
   (event-type :|type|)
   (sender :|sender|))
 
-
 ;;; URI constants for interacting with the Matrix API
 
 (defparameter +login-path+ "/_matrix/client/r0/login")
@@ -145,7 +140,6 @@
 (defun add-auth-header (client headers)
   "If CLIENT has a non-nill ACCESS-TOKEN , adds the token to HEADERS, an ALIST,
    and returns it. Otherwise HEADERS unmodified."
-
   (if (access-token client)
       (cons (cons "Authorization"
                   (concatenate 'string "Bearer " (access-token client)))
@@ -172,7 +166,6 @@
   *RESPONSE-OBJECT*.
 
   When *RESPONSE-STATUS* is anything other than 200 the form in OTHERWISE is run."
-
   `(multiple-value-bind
        (*response-body* *response-status* *response-headers*)
        (drakma:http-request (make-matrix-path ,client ,path)
@@ -292,8 +285,10 @@
 
 (defun start (client)
   (setf (running-p client) t)
-  (loop :while (running-p client)
-        :do (sync client)))
+  (unwind-protect
+       (loop :while (running-p client)
+             :do (sync client))
+    (clean-up client)))
 
 (defun stop (client)
   (setf (running-p client) nil))

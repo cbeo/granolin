@@ -7,9 +7,7 @@
    #:txn-id
    #:client
    #:homeserver
-   #:handle-timeline-event
-   #:handle-room-state-event
-   #:handle-invitation-event
+   #:handle-event
 
    #:getob
    #:event-content
@@ -21,9 +19,16 @@
    #:state-key
    #:prev-content
 
+   #:timeline-event
+   #:room-state-event
+   #:invitation-event
+
    #:send
    #:fetch
 
    #:login
-   #:sync 
+   #:sync
+
+   #:start
+   #:stop 
    ))

@@ -9,7 +9,7 @@
     :documentation "An output stream to which messages are logged."
     )))
 
-(defmethod handle-timeline-event :after ((log message-log) room (event timeline-event))
+(defmethod handle-event :after ((log message-log) room (event timeline-event))
   (format (output log) "~a in ~a: ~a~%"
           (sender event)
           room

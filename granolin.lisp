@@ -1,9 +1,9 @@
-
 ;;;; granolin.lisp
 
 (in-package #:granolin)
 
-;;; Utility for a sequence of IDs
+;;; Utility class for generating a sequence of IDs
+
 (defclass id-source ()
   ((id-source :initform 0)))
 
@@ -26,11 +26,6 @@
     :accessor access-token
     :initform nil
     :type string)
-   (state
-    :accessor state
-    :initform nil
-    :type list
-    :documentation "Holds server and room meta info")
    (next-batch
     :accessor next-batch
     :initform nil
@@ -110,7 +105,7 @@
   (invited-rooms :|rooms| :|invite|))
 
 (def-json-wrap timeline-event
-  (content :|content|)
+  (event-content :|content|)
   (event-type :|type|)
   (event-id :|event_id|)
   (sender :|sender|)
@@ -118,14 +113,14 @@
   (msg-body :|content| :|body|))
 
 (def-json-wrap room-state-event
-  (content :|content|)
+  (event-content :|content|)
   (event-type :|type|)
   (event-id :|event_id|)
   (state-key :|state_key|)
   (prev-content :|prev_content|))
 
 (def-json-wrap invitation-event
-  (content :|content|)
+  (event-content :|content|)
   (state-key :|state_key|)
   (event-type :|type|)
   (sender :|sender|))
@@ -153,6 +148,9 @@
   "Makes a POST request to the Matrix server and binds *RESPONSE-BODY* (a raw
   string, usually JSON formatted) *RESPONSE-STATUS* (an integer) and
   *RESPONSE-HEADERS* (an alist).
+
+  If CLIENT has an ACCESS-TOKEN slot, this token will be added to the headers as
+  the value of an authorization header, as specified in the Matrix API.
 
   BODY is expected to be a PLIST that will be serialized to JSON as the request
   body.
@@ -256,12 +254,8 @@
 (defun handle-sync-response (client)
   (setf (next-batch client)
         (next-batch *response-object*))
-  ;; If client has no STATE, then set the STATE to the response object
-  (if (not (state client))
-      (setf (state client) (copy-tree (sync-response-data *response-object*)))
-      (progn
-        (process-joined-events client)
-        (process-invited-room-events client))))
+  (process-joined-events client)
+  (process-invited-room-events client))
 
 (defun process-joined-events (client)
   (let ((message-event (make-timeline-event :data nil))

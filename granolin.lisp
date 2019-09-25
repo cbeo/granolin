@@ -165,7 +165,7 @@
   `(multiple-value-bind
        (*response-body* *response-status* *response-headers*)
        (drakma:http-request (make-matrix-url ,client ,path)
-                            :additional-headers ,(add-auth-header client headers)
+                            :additional-headers (add-auth-header ,client ,headers)
                             :method ,method
                             :body (jonathan:to-json ,body)
                             :content-type "application/json")
@@ -191,7 +191,7 @@
   `(multiple-value-bind
          (*response-body* *response-status* *response-headers*)
          (drakma:http-request (make-matrix-url ,client ,path)
-                              :additional-headers ,(add-auth-header client headers)
+                              :additional-headers (add-auth-header ,client ,headers)
                               :parameters ,params
                               :method :get)
      (if (= 200 *response-status*)
@@ -206,6 +206,8 @@
 
 
 ;;; API Calls
+
+;(defgeneric login (client user password))
 
 (defun login (client user password)
   "Logs CLIENT into its HOMESERVER withthe provided USER and PASSWORD.
@@ -240,11 +242,13 @@
   "
   (let (params)
     (when (next-batch client)
-      (push (cons "since" (next-batch client))))
+      (push (cons "since" (next-batch client))
+            params))
+
 
     (push (cons "full_state" full-state) params)
 
-    (fetch (client +sync-path+ params :resp-formatter make-sync-response)
+    (fetch (client +sync-path+ :params params :resp-formatter make-sync-response)
            (handle-sync-response client)
            (error "Matrix returned ~a from ~a~"
                   *response-status* +sync-path+))))

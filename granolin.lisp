@@ -22,6 +22,11 @@
     :initarg :homeserver
     :initform (error "HOMESERVER is required.")
     :type string)
+   (hardcopy
+    :accessor hardcopy
+    :initform nil
+    :type pathname
+    :documentation "A file path where client state is saved.")
    (running-p
     :accessor running-p
     :initform t)
@@ -39,11 +44,18 @@
     :accessor next-batch
     :initform nil
     :type string
-    :documentation "Used on sync requests as the value of the SINCE parameter")))
+    :documentation "Used on sync requests as the value of the SINCE parameter"))
+  (:documentation "An instance of CLIENT holds the necessary state for
+  interacting with a Matrix server. If HARDCOPY is supplied, the
+  INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
+  following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH."))
 
 (defun save-client-state (client &key (fname "granolin.conf"))
   "Save a PLIST of client state to disk. Saves HOMESERVER, TIMEOUT,
    ACCESS-TOKEN, and NEXT-BATCH values to the file."
+
+  (when (hardcopy client)
+    (setf fname hardcopy))
 
   (with-open-file (out fname :direction :output)
     (print (list :homeserver (homeserver client)
@@ -54,6 +66,10 @@
 
 (defun load-client-state (client &optional (fname "granolin.conf"))
   "Load client state from a PLIST stored in a file."
+
+  (when (hardcopy client)
+    (setf fname hardcopy))
+
   (let ((conf (with-open-file (in fname) (read in))))
     (setf (homeserver client) (getf conf :homeserver))
     (setf (timeout client) (getf conf :timeout))
@@ -66,7 +82,9 @@
   "Ensure that the homeserver url is well formed, and makes an attempt to format it if it isnt")
 
 (defmethod initialize-instance :after ((client client) &key)
-  (validate-homserver-url client))
+  (validate-homserver-url client)
+  (when (and (hardcopy client) (probe-file (hardcopy client)))
+    (load-client-state client)))
 
 (defgeneric handle-event (client room event)
   (:documentation "Implemented on handlers that need to respond to events.")
@@ -75,7 +93,8 @@
 (defgeneric clean-up (client)
   (:documentation "To be run before the client crashes or is killed.")
   (:method ((client client))
-    (setf (running-p client) nil)))
+    (setf (running-p client) nil)
+    (save-client-state client)))
 
 ;;; Dynamic variables bound during response handling. Each such variable should
 ;;; be bound to a value during any message handler call.

@@ -80,9 +80,8 @@
     form))
 
 (defmacro def-json-wrap (name &rest field-specs)
-  "Defines a struct called NAME with a single slot called DATA.
-
-   The DATA slot holds a PLIST created with JONATHAN:PARSE.
+  "Defines a struct named the value of NAME, a symbol, with a single slot called
+   DATA. DATA holds a PLIST as returned by JONATHAN:PARSE.
 
    Each FIELD-SPEC is a list of the form (METHOD-NAME KEY1 ... KEYN)
 
@@ -128,8 +127,6 @@
          (dolist (,tmp-var (getob room :|timeline| :|events|))
            (setf (room-event-data ,evt-var) ,tmp-var)
            ,@body)))))
-
-
 
 ;;; URI constants for interacting with the Matrix API
 
@@ -257,7 +254,7 @@
         (next-batch *response-object*))
   ;; If client has no STATE, then set the STATE to the response object
   (if (not (state client))
-      (setf (state client) (copy-tree *response-object*))
+      (setf (state client) (copy-tree (sync-response-data *response-object*)))
       (progn
         (process-joined-room-timeline-events client)
         (process-joined-room-state-events client)

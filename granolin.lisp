@@ -22,6 +22,12 @@
     :initarg :homeserver
     :initform (error "HOMESERVER is required.")
     :type string)
+   (timeout
+    :accessor timeout
+    :initarg :timeout
+    :initform (* 1000 10)
+    :type integer
+    :documentation "The length of time, in ms, to wait during long-polling to /sync")
    (access-token
     :accessor access-token
     :initform nil
@@ -243,6 +249,7 @@
   "
   (let (params)
     (push (cons "full_state" full-state) params)
+    (push (cons "timeout" (timeout client)) params)
     (when (next-batch client)
       (push (cons "since" (next-batch client))  params))
 
@@ -276,3 +283,5 @@
       (dolist (ob (getob room :|invite_state| :|events|))
         (setf (invitation-event-data invite-event) ob)
         (handle-invitation-event client room-id invite-event)))))
+
+

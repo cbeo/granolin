@@ -148,7 +148,7 @@
             headers)
       headers))
 
-(defmacro send ((client path body &key (method :put) headers resp-formatter)
+(defmacro send ((client path body &key (method :put) headers wrap)
                 on-ok &optional otherwise)
   "Makes a POST request to the Matrix server and binds *RESPONSE-BODY* (a raw
   string, usually JSON formatted) *RESPONSE-STATUS* (an integer) and
@@ -159,9 +159,10 @@
 
   HEADERS is an ALIST of name-value pairs.
 
-  If *RESPONSE-STATUS* is 200, *RESPONSE-OBJECT* is bound to a PLIST containing
-  the parsed JSON content returned as the response body, then the form in ON-OK
-  is run.
+  If *RESPONSE-STATUS* is 200, *RESPONSE-BODY* is assumed to be JSON text, and
+  is parsed to a PLIST before being wrapped with a call to WRAP. WRAP must be
+  the name of a constructor defined with DEF-JSON-WRAP. The result is bound to
+  *RESPONSE-OBJECT*.
 
   When *RESPONSE-STATUS* is anything other than 200 the form in OTHERWISE is run."
 
@@ -174,20 +175,21 @@
                             :content-type "application/json")
      (if (= 200 *response-status*)
          (let ((*response-object*
-                 (,resp-formatter
+                 (,wrap
                   :data (jonathan:parse *response-body*))))
            ,on-ok)
          ,otherwise)))
 
 
-(defmacro fetch ((client path &key params headers resp-formatter)
+(defmacro fetch ((client path &key params headers wrap)
                  on-ok &optional otherwise)
   "Makes a GET request to the Matrix server and binds *RESPONSE-BODY* (see below),
   *RESPONSE-STATUS* (an integer) and *RESPONSE-HEADERS* (an alist).
 
-  If *RESPONSE-STATUS* is 200, *RESPONSE-BODY* is bound to a PLIST containing
-  the parsed JSON content returned as the response body, then the form in ON-OK
-  is run.
+  If *RESPONSE-STATUS* is 200, *RESPONSE-BODY* is assumed to be JSON text, and
+  is parsed to a PLIST before being wrapped with a call to WRAP. WRAP must be
+  the name of a constructor defined with DEF-JSON-WRAP. The result is bound to
+  *RESPONSE-OBJECT*.
 
   If *RESPONSE-STATUS* is anything other than 200, then the form in OTHERWISE is
   run."
@@ -199,7 +201,7 @@
                               :method :get)
      (if (= 200 *response-status*)
          (let ((*response-object*
-                 (,resp-formatter
+                 (,wrap
                   :data (jonathan:parse *response-body*))))
            ,on-ok)
          ,otherwise)))
@@ -223,7 +225,7 @@
 
     (send (client +login-path+ body
            :method :post
-           :resp-formatter make-login-response)
+           :wrap make-login-response)
 
           (setf (access-token client)
                 (access-token *response-object*))
@@ -246,7 +248,7 @@
     (when (next-batch client)
       (push (cons "since" (next-batch client))  params))
 
-    (fetch (client +sync-path+ :params params :resp-formatter make-sync-response)
+    (fetch (client +sync-path+ :params params :wrap make-sync-response)
            (handle-sync-response client)
            (error "Matrix returned ~a from ~a~"
                   *response-status* +sync-path+))))

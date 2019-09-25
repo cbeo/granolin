@@ -109,24 +109,27 @@
   (joined-rooms :|rooms| :|join|)
   (invited-rooms :|rooms| :|invite|))
 
-(def-json-wrap room-event
+(def-json-wrap timeline-event
   (content :|content|)
   (event-type :|type|)
   (event-id :|event_id|)
+  (sender :|sender|)
+  (msg-type :|content| :|msgtype|)
+  (msg-body :|content| :|body|))
+
+(def-json-wrap room-state-event
+  (content :|content|)
+  (event-type :|type|)
+  (event-id :|event_id|)
+  (state-key :|state_key|)
+  (prev-content :|prev_content|))
+
+(def-json-wrap invitation-event
+  (content :|content|)
+  (state-key :|state_key|)
+  (event-type :|type|)
   (sender :|sender|))
 
-(defmacro  do-timeline-events ((room-var evt-var resp) &body body)
-  "RESP is a SYNC-RESPONSE instance, probably passed in as *RESPONSE-OBJECT*.
-
-  ROOM-VAR becomes bound to the id of each room as it is processed, and EVT-VAR
-  to a ROOM-EVENT instance in that room."
-
-  (let ((tmp-var (gensym)))
-    `(let ((,evt-var (make-room-event :data nil)))
-       (loop :for (,room-var room . ignore) :on (joined-rooms ,resp) :by #'cddr :do
-         (dolist (,tmp-var (getob room :|timeline| :|events|))
-           (setf (room-event-data ,evt-var) ,tmp-var)
-           ,@body)))))
 
 ;;; URI constants for interacting with the Matrix API
 
@@ -207,8 +210,6 @@
 
 ;;; API Calls
 
-;(defgeneric login (client user password))
-
 (defun login (client user password)
   "Logs CLIENT into its HOMESERVER withthe provided USER and PASSWORD.
 
@@ -241,12 +242,9 @@
   https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-sync
   "
   (let (params)
-    (when (next-batch client)
-      (push (cons "since" (next-batch client))
-            params))
-
-
     (push (cons "full_state" full-state) params)
+    (when (next-batch client)
+      (push (cons "since" (next-batch client))  params))
 
     (fetch (client +sync-path+ :params params :resp-formatter make-sync-response)
            (handle-sync-response client)
@@ -260,20 +258,25 @@
   (if (not (state client))
       (setf (state client) (copy-tree (sync-response-data *response-object*)))
       (progn
-        (process-joined-room-timeline-events client)
-        (process-joined-room-state-events client)
+        (process-joined-events client)
         (process-invited-room-events client))))
 
-(defun process-joined-room-timeline-events (client)
-  (do-timeline-events (room-id event *response-object*)
-    (handle-timeline-event client room-id event)))
+(defun process-joined-events (client)
+  (let ((message-event (make-timeline-event :data nil))
+        (state-event (make-room-state-event :data nil)))
+    (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
+      ;; handle the timeline events (aka room events)
+      (dolist (ob (getob room :|timeline| :|events|))
+        (setf (timeline-event-data message-event) ob)
+        (handle-timeline-event client room-id message-event))
+      ;; handle state chnage events (aka state events)
+      (dolist (ob (getob room :|state| :|events|))
+        (setf (room-state-event-data state-event) ob)
+        (handle-room-state-event client room-id state-event)))))
 
-(defun process-joined-room-state-events (client))
-  ;; TODO
-  ;; (do-room-state-events (room-id event *response-object*)
-  ;;   (handle-room-state-event client room-id event)))
-
-(defun process-invited-room-events (client))
-  ;; TODO
-  ;; (do-room-invited-events (room-id event)
-  ;;   (handle-invitation-event client room-id event )))
+(defun process-invited-room-events (client)
+  (let ((invite-event (make-invitation-event :data nil)))
+    (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
+      (dolist (ob (getob room :|invite_state| :|events|))
+        (setf (invitation-event-data invite-event) ob)
+        (handle-invitation-event client room-id invite-event)))))

@@ -3,9 +3,7 @@
 
 (in-package #:granolin)
 
-
-
-
+;;; Utility for a sequence of IDs
 (defclass id-source ()
   ((id-source :initform 0)))
 
@@ -16,8 +14,7 @@
      (format nil "~r, ~r bats ha hah hahhh" id-source id-source))))
 
 
-(defparameter +login-path+ "/_matrix/client/r0/login")
-(defparameter +sync-path+ "/_matrix/client/r0/sync")
+;;; The main matrix client class
 
 (defclass client (id-source)
   ((homeserver
@@ -39,6 +36,26 @@
     :initform nil
     :type string
     :documentation "Used on sync requests as the value of the SINCE parameter")))
+
+;; TODO
+(defun validate-homserver-url (client)
+  "Ensure that the homeserver url is well formed, and makes an attempt to format it if it isnt")
+
+(defmethod initialize-instance :after ((client client) &key)
+  (validate-homserver-url client))
+
+(defgeneric handle-timeline-event (client room event)
+  (:documentation "Implemented on handlers that need to respond to timeline events.")
+  (:method ((client client) room event) t))
+
+(defgeneric handle-room-state-event (client room event)
+  (:documentation "Implemented on handlers that need to respond to room state change events.")
+  (:method ((client client) room event) t))
+
+(defgeneric handle-invitation-event (client room event)
+  (:documentation "Implemented on handlers that need to respond to room invitations.")
+  (:method ((client client) room event) t))
+
 
 ;;; Dynamic variables bound during response handling. Each such variable should
 ;;; be bound to a value during any message handler call.
@@ -112,6 +129,15 @@
            (setf (room-event-data ,evt-var) ,tmp-var)
            ,@body)))))
 
+
+
+;;; URI constants for interacting with the Matrix API
+
+(defparameter +login-path+ "/_matrix/client/r0/login")
+(defparameter +sync-path+ "/_matrix/client/r0/sync")
+
+;;; Utility functions and macros for making HTTP requests to the MATRIX API
+
 (defun add-auth-header (client headers)
   "If CLIENT has a non-nill ACCESS-TOKEN , adds the token to HEADERS, an ALIST,
    and returns it. Otherwise HEADERS unmodified."
@@ -178,14 +204,11 @@
            ,on-ok)
          ,otherwise)))
 
-(defun validate-homserver-url (client)
-  "ensure that hte homeserver url is well formed, and makes an attempt to format it if it isnt")
-
-(defmethod initialize-instance :after ((client clienxt) &key)
-  (validate-homserver-url client))
-
 (defun make-matrix-path (client path)
   (concatenate 'string (homeserver client) path))
+
+
+;;; API Calls
 
 (defun login (client user password)
   "Logs CLIENT into its HOMESERVER withthe provided USER and PASSWORD.
@@ -240,15 +263,16 @@
         (process-joined-room-state-events client)
         (process-invited-room-events client))))
 
-
 (defun process-joined-room-timeline-events (client)
-  (let ((event (make-room-event)))
-    (dolist (eob (getob ())))
+  (do-timeline-events (room-id event *response-object*)
+    (handle-timeline-event client room-id event)))
 
-(defmacro def-event-list-processor (name handler-name &rest keys)
-  `(defun ,name (client)
-     (dolist (event (getob (response-object-data *response-object*) ,@keys))
-       (,handler-name client event))))
+(defun process-joined-room-state-events (client))
+  ;; TODO
+  ;; (do-room-state-events (room-id event *response-object*)
+  ;;   (handle-room-state-event client room-id event)))
 
-
-
+(defun process-invited-room-events (client))
+  ;; TODO
+  ;; (do-room-invited-events (room-id event)
+  ;;   (handle-invitation-event client room-id event )))

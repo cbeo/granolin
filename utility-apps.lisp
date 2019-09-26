@@ -23,7 +23,7 @@
                   ("event type" . ,(event-type event))
                   ("message type" . ,(msg-type event))
                   ("messge body" . ,(msg-body event))
-                  ("content" . ,(event-content event)))))m
+                  ("content" . ,(event-content event)))))
     (print-assoc fields (output log))
     (terpri (output log))))
 
@@ -38,14 +38,13 @@
     (terpri (output log))))
 
 
-
 ;;; A Room and User Directory Bot
 
-(defstruct (server-room (:conc-name room-))
-  (id "")
-  (name "")
-  (aliases nil)
-  (members nil))
+(defclass server-room ()
+  ((id :accessor room-id :initarg :id :initform (error "Must have a room-id"))
+   (name :accessor room-name :initarg :name :initform "")
+   (aliases :accessor room-aliases :initarg :aliases :initform nil)
+   (members :accessor room-members :initarg :members :initform nil)))
 
 (defclass server-directory ()
   ((directory-table
@@ -53,38 +52,40 @@
     :initform (make-hash-table :test 'equal)
     :documentation "A table mapping room IDs to room struct instances.")))
 
+(defun get-room (client room-id)
+  "Get the SERVER-ROOM struct keyed by ROOM-ID, or return NIL."
+  (gethash room-id (directory-table client)))
+
+
 (defun update-room-name (client room-id name)
-  (let ((room (gethash room-id (directory-table client))))
+  (let ((room (get-room client room-id)))
     (if room
         (setf (room-name room) name)
-        (setf room (make-server-room :id room-id :name name)))
+        (setf room (make-instance 'server-room :id room-id :name name)))
     (setf (gethash room-id (directory-table client)) room)))
 
 (defun update-room-member (client room-id member)
-  (let ((room (gethash room-id (directory-table client))))
+  (let ((room (get-room client room-id)))
     (if room
         (pushnew member (room-members room) :test #'equal)
-        (setf room (make-server-room :id room-id :members (list member))))
+        (setf room (make-instance 'server-room :id room-id :members (list member))))
     (setf (gethash room-id (directory-table client)) room)))
 
 ;; TODO
 (defun update-room-aliases (client room-id member)
   (declare (ignore client room-id member)))
 
-(defmethod handle-event :after ((client server-directory) room (event room-state-event))
+(defmethod handle-event :after ((client server-directory) room-id (event room-state-event))
   (cond
     ((string= "m.room.name" (event-type event))
-     (update-room-name client room (room-name event)))
+     (update-room-name client room-id (room-name event)))
 
     ((string= "m.room.member" (event-type event))
-     (update-room-member client room (sender event)))
+     (update-room-member client room-id (sender event)))
 
     ((string= "m.room.aliases" (event-type event))
-     (update-room-aliases client room (room-aliases event)))))
+     (update-room-aliases client room-id (room-aliases event)))))
 
-(defun get-room (client room-id)
-  "Get the SERVER-ROOM struct keyed by ROOM-ID, or return NIL."
-  (gethash room-id (directory-table client)))
 
 (defun name-of-room (client room-id)
   "Looks up the name of a room with ROOM-ID. Returns a string of NIL"

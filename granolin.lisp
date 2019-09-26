@@ -308,6 +308,9 @@
   (let ((message-event (make-timeline-event :data nil))
         (state-event (make-room-state-event :data nil)))
     (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
+
+      (setf room-id (symbol-name room-id))
+
       ;; handle the timeline events (aka room events)
       (dolist (ob (getob room :|timeline| :|events|))
         (setf (timeline-event-data message-event) ob)
@@ -320,6 +323,7 @@
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
     (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
+      (setf room-id (symbol-name room-id))
       (dolist (ob (getob room :|invite_state| :|events|))
         (setf (invitation-event-data invite-event) ob)
         (handle-event client room-id invite-event)))))

@@ -6,6 +6,8 @@
 
    #:txn-id
    #:client
+   #:message-log
+   #:server-directory
    #:homeserver
    #:logged-in-p
    #:handle-event

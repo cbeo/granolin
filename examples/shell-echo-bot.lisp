@@ -1,5 +1,8 @@
 
-(defclass shell-echo-bot (granolin:client granolin::message-log) ())
+(defclass shell-echo-bot (granolin:client
+                          granolin:message-log
+                          granolin:server-directory)
+  ())
 
 (defvar *bot*
   (make-instance 'shell-echo-bot
@@ -11,7 +14,7 @@
 
 ;; a script to login if necessary, and then start the bot
 
-(unless (granolin:logged-in-p *bot*) 
+(unless (granolin:logged-in-p *bot*)
   (princ "Log in to the server:")
   (terpri)
   (granolin:login *bot*

@@ -8,7 +8,14 @@
    #:client
    #:homeserver
    #:logged-in-p
+   #:hardcopy
+   #:timeout
+   #:save-client-state
+   #:load-client-state
+
+   ;; bot generic functions
    #:handle-event
+   #:clean-up
 
    ;; utility classes
    #:message-log
@@ -16,6 +23,7 @@
    #:auto-joiner
 
    ;; json data utilities & accessors
+   #:def-json-wrap
    #:event-content
    #:event-id
    #:event-type
@@ -30,6 +38,14 @@
 
    ;; event types
    #:timeline-event
+   #:text-message-event
+   #:image-message-event
+   #:audio-message-event
+   #:file-message-event
+   #:video-message-event
+   #:emote-message-event
+   #:notice-message-event
+   #:location-message-event
    #:room-state-event
    #:invitation-event
 

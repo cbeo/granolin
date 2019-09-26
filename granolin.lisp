@@ -60,6 +60,7 @@
   following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH."))
 
 (defun logged-in-p (client)
+  "T if the client has an access token."
   (and (access-token client) t))
 
 (defun save-client-state (client &key fname)
@@ -170,6 +171,35 @@
   (msg-type :|content| :|msgtype|)
   (msg-body :|content| :|body|))
 
+(defmacro def-timeline-event-pred (name etype mtype)
+  `(defun ,name (event)
+     (and (equal ,etype (getob event :|type|))
+          (equal ,mtype (getob event :|content| :|msgtype|)))))
+
+(defstruct (text-message-event (:include timeline-event)))
+(def-timeline-event-pred text-message-event-p* "m.room.message" "m.text")
+
+(defstruct (image-message-event (:include timeline-event)))
+(def-timeline-event-pred image-message-event-p* "m.room.message" "m.image")
+
+(defstruct (audio-message-event (:include timeline-event)))
+(def-timeline-event-pred audio-message-event-p* "m.room.message" "m.audio")
+
+(defstruct (file-message-event (:include timeline-event)))
+(def-timeline-event-pred file-message-event-p* "m.room.message" "m.file")
+
+(defstruct (video-message-event (:include timeline-event)))
+(def-timeline-event-pred video-message-event-p* "m.room.message" "m.video")
+
+(defstruct (emote-message-event (:include timeline-event)))
+(def-timeline-event-pred emote-message-event-p* "m.room.message" "m.emote")
+
+(defstruct (notice-message-event (:include timeline-event)))
+(def-timeline-event-pred notice-message-event-p* "m.room.message" "m.notice")
+
+(defstruct (location-message-event (:include timeline-event)))
+(def-timeline-event-pred location-message-event-p* "m.room.message" "m.location")
+
 (def-json-wrap room-state-event
   (event-content :|content|)
   (sender :|sender|)
@@ -240,7 +270,6 @@
                   :data (jonathan:parse (flexi-streams:octets-to-string *response-body*)))))
            ,on-ok)
          ,otherwise)))
-
 
 (defmacro fetch ((client path &key params headers wrap)
                  on-ok &optional otherwise)
@@ -323,21 +352,65 @@
   (process-joined-events client)
   (process-invited-room-events client))
 
-(defun process-joined-events (client)
-  (let ((message-event (make-timeline-event :data nil))
-        (state-event (make-room-state-event :data nil)))
-    (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
 
+;; The following globals are private and are recycled per call to sync
+(defvar *timeline-event* (make-timeline-event :data nil))
+(defvar *text-message-event* (make-text-message-event :data nil))
+(defvar *image-message-event* (make-image-message-event :data nil))
+(defvar *audio-message-event* (make-audio-message-event :data nil))
+(defvar *file-message-event* (make-file-message-event :data nil))
+(defvar *video-message-event* (make-video-message-event :data nil))
+(defvar *emote-message-event* (make-emote-message-event :data nil))
+(defvar *notice-message-event* (make-notice-message-event :data nil))
+(defvar *location-message-event* (make-location-message-event :data nil))
+(defvar *state-event* (make-room-state-event :data nil))
+
+(defun categorize-and-set-event (ob)
+  (cond
+    ((text-message-event-p* ob)
+     (setf (timeline-event-data *text-message-event*) ob)
+     *text-message-event*)
+    ((image-message-event-p* ob)
+     (setf (timeline-event-data *image-message-event*) ob)
+     *image-message-event*)
+    ((audio-message-event-p* ob)
+     (setf (timeline-event-data *audio-message-event*) ob)
+     *audio-message-event*)
+    ((file-message-event-p* ob)
+     (setf (timeline-event-data *file-message-event*) ob)
+     *file-message-event*)
+    ((video-message-event-p* ob)
+     (setf (timeline-event-data *video-message-event*) ob)
+     *video-message-event*)
+    ((emote-message-event-p* ob)
+     (setf (timeline-event-data *emote-message-event*) ob)
+     *emote-message-event*)
+    ((notice-message-event-p* ob)
+     (setf (timeline-event-data *notice-message-event*) ob)
+     *notice-message-event*)
+    ((location-message-event-p* ob)
+     (setf (timeline-event-data *location-message-event*) ob)
+     *location-message-event*)
+    (t
+     (setf (timeline-event-data *timeline-event*) ob)
+     *timeline-event*)))
+
+
+(defun process-joined-events (client)
+  (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
+      ;; room-id should be a string
       (setf room-id (symbol-name room-id))
 
       ;; handle the timeline events (aka room events)
       (dolist (ob (getob room :|timeline| :|events|))
-        (setf (timeline-event-data message-event) ob)
-        (handle-event client room-id message-event))
+        (handle-event client
+                      room-id
+                      (categorize-and-set-event ob)))
+
       ;; handle state chnage events (aka state events)
       (dolist (ob (getob room :|state| :|events|))
-        (setf (room-state-event-data state-event) ob)
-        (handle-event client room-id state-event)))))
+        (setf (room-state-event-data *state-event*) ob)
+        (handle-event client room-id *state-event*))))
 
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
@@ -356,18 +429,22 @@
     (send (client url body :wrap make-basic-json) t)))
 
 
-
-
 (defun join-room (client room-id)
+  "Attempts to join the client to the room with ROOM-ID."
   (let ((body (list :|roomId| room-id))
         (url (format nil +join-room-path+ room-id)))
     (send (client url body :method :post :wrap make-basic-json)
-          (format *standard-output* "JOINED ROOM ~a" room-id)
-          (format *error-output* "JOIN ROOM FAILED ~a" room-id))))
+          t ; do nothing in case of success
+          (format *error-output* "FAILED to join room: ~a.~%HTTP response: ~a ~a~%"
+                  room-id
+                  *response-status*
+                  (flexi-streams:octets-to-string *response-body*)))))
 
 ;;; bot loop
 
 (defun start (client)
+  "Repeatedly calls SYNC with this cleint. If something goes wrong, CLEAN-UP
+   will be called before the process dies."
   (setf (running-p client) t)
   (unwind-protect
        (loop :while (running-p client)

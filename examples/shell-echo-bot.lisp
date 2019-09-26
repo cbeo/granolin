@@ -11,7 +11,7 @@
 
 ;; a script to login if necessary, and then start the bot
 
-(unless (access-token *bot*) 
+(unless (granolin:logged-in-p *bot*) 
   (princ "Log in to the server:")
   (terpri)
   (granolin:login *bot*
@@ -19,4 +19,4 @@
                   (and (princ "password: ") (read-line))))
 
 
-(start *bot*)
+(granolin:start *bot*)

@@ -13,7 +13,6 @@
     (base64:string-to-base64-string
      (format nil "~r, ~r bats ha hah hahhh" id-source id-source))))
 
-
 ;;; The main matrix client class
 
 (defclass client (id-source)
@@ -24,6 +23,7 @@
     :type string)
    (hardcopy
     :accessor hardcopy
+    :initarg :hardcopy
     :initform nil
     :type pathname
     :documentation "A file path where client state is saved.")
@@ -50,12 +50,15 @@
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
   following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH."))
 
-(defun save-client-state (client &key (fname "granolin.conf"))
+(defun logged-in-p (client)
+  (and (access-token client) t))
+
+(defun save-client-state (client &key fname)
   "Save a PLIST of client state to disk. Saves HOMESERVER, TIMEOUT,
    ACCESS-TOKEN, and NEXT-BATCH values to the file."
 
-  (when (hardcopy client)
-    (setf fname hardcopy))
+  (when (and (not fname) (hardcopy client))
+    (setf fname (hardcopy client)))
 
   (with-open-file (out fname :direction :output)
     (print (list :homeserver (homeserver client)
@@ -64,14 +67,13 @@
                  :next-batch (next-batch client))
            out)))
 
-(defun load-client-state (client &optional (fname "granolin.conf"))
+(defun load-client-state (client &optional fname)
   "Load client state from a PLIST stored in a file."
 
-  (when (hardcopy client)
-    (setf fname hardcopy))
+  (when (and (not fname) (hardcopy client))
+    (setf fname (hardcopy client)))
 
   (let ((conf (with-open-file (in fname) (read in))))
-    (setf (homeserver client) (getf conf :homeserver))
     (setf (timeout client) (getf conf :timeout))
     (setf (access-token client) (getf conf :access-token))
     (setf (next-batch client) (getf conf :next-batch)))
@@ -162,6 +164,8 @@
   (event-type :|type|)
   (event-id :|event_id|)
   (state-key :|state_key|)
+  (room-name :|content| :|name|)        ; only valid on m.room.name
+  (room-aliases :|content| :|aliases|)  ; only valid on m.room.aliases
   (prev-content :|prev_content|))
 
 (def-json-wrap invitation-event

@@ -7,6 +7,7 @@
    #:txn-id
    #:client
    #:homeserver
+   #:logged-in-p
    #:handle-event
 
    #:getob
@@ -31,4 +32,5 @@
 
    #:start
    #:stop
+
    ))

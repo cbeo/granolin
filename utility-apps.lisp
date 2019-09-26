@@ -96,9 +96,8 @@
   whose name contains the NAME as a substring is returned. If FULL is T, then
   the SERVER-ROOM structs themselves are returned."
   (with-slots (directory-table) client
-    (loop :for room-id :being :the :hash-keys :of directory-table
-          :for room :being :the :hash-values :of directory-table
+    (loop :for room :being :the :hash-values :of directory-table
           :when (or (string-equal name (room-name room))
                     (and like (search name (room-name room) :test #'string-equal)))
-            :collect (if full room room-id))))
+            :collect (if full room (room-id room)))))
 

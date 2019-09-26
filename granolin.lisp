@@ -337,12 +337,8 @@
   (let ((url (format nil +text-message-path+ room-id (txn-id client)))
         (body (list :|msgtype| "m.text"
                     :|body| message)))
-    (format t "url: ~a~%" url)
-    (send (client url body :wrap make-basic-json)
-          (format t "Message Sent: ~a ~a" room-id message)
-          (format t "Message Failed To Send ~a ~a"
-                  *response-status*
-                  (flexi-streams:octets-to-string *response-body*)))))
+    (send (client url body :wrap make-basic-json) t)))
+
 
 ;;; bot loop
 

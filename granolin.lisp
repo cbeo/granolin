@@ -10,8 +10,8 @@
 (defun txn-id (source)
   (with-slots (id-source) source
     (incf id-source)
-    (base64:string-to-base64-string
-     (format nil "~r, ~r bats ha hah hahhh" id-source id-source))))
+    (format nil "~a" id-source)))
+
 
 ;;; The main matrix client class
 
@@ -181,7 +181,7 @@
 
 (defparameter +login-path+ "/_matrix/client/r0/login")
 (defparameter +sync-path+ "/_matrix/client/r0/sync")
-
+(defparameter +text-message-path+ "/_matrix/client/r0/rooms/~a/send/m.room.message/~a")
 
 ;;; Utility functions and macros for making HTTP requests to the MATRIX API
 
@@ -332,6 +332,17 @@
         (setf (invitation-event-data invite-event) ob)
         (handle-event client room-id invite-event)))))
 
+
+(defun send-text-message (client room-id message)
+  (let ((url (format nil +text-message-path+ room-id (txn-id client)))
+        (body (list :|msgtype| "m.text"
+                    :|body| message)))
+    (format t "url: ~a~%" url)
+    (send (client url body :wrap make-basic-json)
+          (format t "Message Sent: ~a ~a" room-id message)
+          (format t "Message Failed To Send ~a ~a"
+                  *response-status*
+                  (flexi-streams:octets-to-string *response-body*)))))
 
 ;;; bot loop
 

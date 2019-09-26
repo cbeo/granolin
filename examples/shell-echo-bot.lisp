@@ -1,7 +1,8 @@
 
 (defclass shell-echo-bot (granolin:client
                           granolin:message-log
-                          granolin:server-directory)
+                          granolin:server-directory
+                          granolin::auto-joiner)
   ())
 
 (defvar *bot*

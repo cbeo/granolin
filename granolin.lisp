@@ -174,10 +174,14 @@
   (event-type :|type|)
   (sender :|sender|))
 
+(def-json-wrap basic-json)
+
+
 ;;; URI constants for interacting with the Matrix API
 
 (defparameter +login-path+ "/_matrix/client/r0/login")
 (defparameter +sync-path+ "/_matrix/client/r0/sync")
+
 
 ;;; Utility functions and macros for making HTTP requests to the MATRIX API
 

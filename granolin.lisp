@@ -1,5 +1,9 @@
 ;;;; granolin.lisp
 
+;;;; While reading this file, any symbol, function, etc with a docstring should
+;;;; be exported from the granolin package. Anything else should be considered
+;;;; "private".
+
 (in-package #:granolin)
 
 ;;; Utility class for generating a sequence of IDs
@@ -20,6 +24,11 @@
     :reader homeserver
     :initarg :homeserver
     :initform (error "HOMESERVER is required.")
+    :type string)
+   (user-id
+    :accessor user-id
+    :initarg :user-id
+    :initform nil
     :type string)
    (hardcopy
     :accessor hardcopy
@@ -60,11 +69,13 @@
   (when (and (not fname) (hardcopy client))
     (setf fname (hardcopy client)))
 
-  (with-open-file (out fname :direction :output)
-    (print (list :homeserver (homeserver client)
-                 :timeout (timeout client)
-                 :access-token (access-token client)
-                 :next-batch (next-batch client))
+  (with-open-file (out fname :direction :output :if-exists :supersede)
+    (print (list
+            :id-source (slot-value client 'id-source)
+            :homeserver (homeserver client)
+            :timeout (timeout client)
+            :access-token (access-token client)
+            :next-batch (next-batch client))
            out)))
 
 (defun load-client-state (client &optional fname)
@@ -74,6 +85,7 @@
     (setf fname (hardcopy client)))
 
   (let ((conf (with-open-file (in fname) (read in))))
+    (setf (slot-value client 'id-source) (getf conf :id-source))
     (setf (timeout client) (getf conf :timeout))
     (setf (access-token client) (getf conf :access-token))
     (setf (next-batch client) (getf conf :next-batch)))
@@ -181,6 +193,7 @@
 
 (defparameter +login-path+ "/_matrix/client/r0/login")
 (defparameter +sync-path+ "/_matrix/client/r0/sync")
+(defparameter +join-room-path+ "/_matrix/client/r0/rooms/~a/join")
 (defparameter +text-message-path+ "/_matrix/client/r0/rooms/~a/send/m.room.message/~a")
 
 ;;; Utility functions and macros for making HTTP requests to the MATRIX API
@@ -257,7 +270,6 @@
 (defun make-matrix-path (client path)
   (concatenate 'string (homeserver client) path))
 
-
 ;;; API Calls
 
 (defun login (client user password)
@@ -275,8 +287,11 @@
            :method :post
            :wrap make-login-response)
 
-          (setf (access-token client)
-                (access-token *response-object*))
+          (progn
+            (setf (user-id client)
+                  (user-id *response-body*))
+            (setf (access-token client)
+                  (access-token *response-object*)))
 
           (error "Attempt to login ~a : ~a failed with ~a"
                  user password *response-status*))))
@@ -334,11 +349,21 @@
 
 
 (defun send-text-message (client room-id message)
+  "Sends the MESSAGE (a string) to the room with id ROOM-ID."
   (let ((url (format nil +text-message-path+ room-id (txn-id client)))
         (body (list :|msgtype| "m.text"
                     :|body| message)))
     (send (client url body :wrap make-basic-json) t)))
 
+
+
+
+(defun join-room (client room-id)
+  (let ((body (list :|roomId| room-id))
+        (url (format nil +join-room-path+ room-id)))
+    (send (client url body :method :post :wrap make-basic-json)
+          (format *standard-output* "JOINED ROOM ~a" room-id)
+          (format *error-output* "JOIN ROOM FAILED ~a" room-id))))
 
 ;;; bot loop
 

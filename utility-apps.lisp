@@ -125,13 +125,3 @@
                (getf (event-content event) :|join_rule|))
     (join-room client room-id)))
 
-(defparameter +join-room-path+ "/_matrix/client/r0/rooms/~a/join")
-
-
-
-(defun join-room (client room-id)
-  (let ((body (list :|roomId| room-id))
-        (url (format nil +join-room-path+ room-id)))
-    (send (client url body :method :post :wrap make-basic-json)
-          (format *standard-output* "JOINED ROOM ~a" room-id)
-          (format *error-output* "JOIN ROOM FAILED ~a" room-id))))

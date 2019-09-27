@@ -57,7 +57,8 @@
   ((id :accessor room-id :initarg :id :initform (error "Must have a room-id"))
    (name :accessor room-name :initarg :name :initform "")
    (aliases :accessor room-aliases :initarg :aliases :initform nil)
-   (members :accessor room-members :initarg :members :initform nil)))
+   (members :accessor room-members :initarg :members :initform nil)
+   (direct-p :accessor direct-p :initarg :direct-p :initform)))
 
 (defclass server-directory ()
   ((directory-table
@@ -68,7 +69,6 @@
 (defun get-room (client room-id)
   "Get the SERVER-ROOM struct keyed by ROOM-ID, or return NIL."
   (gethash room-id (directory-table client)))
-
 
 (defun update-room-name (client room-id name)
   (let ((room (get-room client room-id)))
@@ -88,8 +88,9 @@
 (defun update-room-aliases (client room-id member)
   (declare (ignore client room-id member)))
 
-(defmethod handle-event :after
-    ((client server-directory) (event room-state-event) &optional room-id)
+(defmethod handle-event :after ((client server-directory)
+                                (event room-state-event)
+                                &optional room-id)
   (cond
     ((string= "m.room.name" (event-type event))
      (update-room-name client room-id (room-name event)))
@@ -100,6 +101,17 @@
     ((string= "m.room.aliases" (event-type event))
      (update-room-aliases client room-id (room-aliases event)))))
 
+(defmethod handle-event :after ((client server-directory)
+                                (event account-data-event)
+                                &optional room-id)
+  (declare (ignore room-id))
+  (when (equal "m.direct" (event-type event))
+    (loop :for (user room-ids . more) :on (event-content event) :by #'cddr :do
+      (dolist (room-id room-ids)
+        (mark-as-direct client room-id)))))
+
+(defun mark-as-direct (client room-id)
+  (setf (direct-p (get-room client room-id)) t))
 
 (defun name-of-room (client room-id)
   "Looks up the name of a room with ROOM-ID. Returns a string of NIL"
@@ -124,15 +136,38 @@
         (pushnew user contacts :test #'equal)))
     contacts))
 
-(defun find-contact (client name &key like)
-  "Finds a specific matrix ID by name. If LIKE is NIL, returns a string equal to
-   NAME if this client has a contact with that NAME, or NIL otherwise. If LIKE
-   is not NIL returns the first matrix ID found that contains NAME as a
-   substring, or NIL if no such matrix ID is found."
-  (find-if (lambda (contact)
-             (or (equal name contact)
-                 (and like (search name contact :test #'string-equal))))
-        (client-contacts client)))
+(defun room-member-p (room name &key like)
+  (some (lambda (memb) (or (equal name memb)
+                           (and like (search name memb :test #'string-equal))))
+        (members room)))
+
+;; TODO might be too nebulous.  Could be split up into two functions.
+(defun find-contact (client name &key like get-direct-room)
+  "Finds a specific matrix or room ID by user name.
+
+   If LIKE is NIL, returns a string equal to NAME if this client has a contact
+   with that NAME, or NIL otherwise.
+
+   If LIKE is not NIL, returns the first matrix ID found that contains NAME as a
+   substring, or NIL if no such matrix ID is found.
+
+   If GET-DIRECT-ROOM is not NIL, behave as above, except return a room address
+   instead. The returned address is usable for direct chats with the contact."
+  (if get-direct-room
+      ;; return a room-id if the room is marked as direct and has name as a member
+      (with-hash-table-iterator (next-room (directory-table client))
+        (loop
+          (multiple-value-bind (theres-more room-id room) (next-room)
+            (unless theres-more (return nil))
+            (when (and (direct-p room)
+                       (room-member-p room name :like like))
+              (return room-id)))))
+      ;; return a user-id
+      (find-if (lambda (contact)
+                 (or (equal name contact)
+                     (and like (search name contact :test #'string-equal))))
+               (client-contacts client)))
+
 
 ;;; Basic Joiner Bot
 

@@ -4,6 +4,13 @@
   (:use #:cl)
   (:export
 
+   ;; macros
+   #:let-cond
+   #:let-if
+   #:let-when
+   #:getob
+   #:def-json-wrap
+
    ;; main class
    #:client
    #:homeserver
@@ -23,11 +30,9 @@
    #:auto-joiner
 
    ;; json data utilities & accessors
-   #:def-json-wrap
    #:event-content
    #:event-id
    #:event-type
-   #:getob
    #:msg-body
    #:msg-type
    #:prev-content

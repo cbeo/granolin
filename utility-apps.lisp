@@ -58,7 +58,7 @@
    (name :accessor room-name :initarg :name :initform "")
    (aliases :accessor room-aliases :initarg :aliases :initform nil)
    (members :accessor room-members :initarg :members :initform nil)
-   (direct-p :accessor direct-p :initarg :direct-p :initform)))
+   (direct-p :accessor direct-p :initarg :direct-p :initform nil)))
 
 (defclass server-directory ()
   ((directory-table
@@ -166,7 +166,7 @@
       (find-if (lambda (contact)
                  (or (equal name contact)
                      (and like (search name contact :test #'string-equal))))
-               (client-contacts client)))
+               (client-contacts client))))
 
 
 ;;; Basic Joiner Bot

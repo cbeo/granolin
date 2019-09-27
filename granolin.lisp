@@ -221,6 +221,7 @@
   (event-content :|content|)
   (event-type :|type|))
 
+;; the basic-json struct is used as a kind of default in some places
 (def-json-wrap basic-json)
 
 
@@ -355,7 +356,8 @@
   (setf (next-batch client)
         (next-batch *response-object*))
   (process-joined-events client)
-  (process-invited-room-events client))
+  (process-invited-room-events client)
+  (process-account-data-events client))
 
 
 ;; The following globals are private and are recycled per call to sync

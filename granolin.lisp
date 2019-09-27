@@ -412,6 +412,7 @@
         (setf (room-state-event-data *state-event*) ob)
         (handle-event client room-id *state-event*))))
 
+
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
     (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
@@ -421,11 +422,12 @@
         (handle-event client room-id invite-event)))))
 
 
-(defun send-text-message (client room-id message)
-  "Sends the MESSAGE (a string) to the room with id ROOM-ID."
+(defun send-text-message (client room-id message &rest args)
+  "Sends the MESSAGE (a string) to the room with id ROOM-ID. MESSAGE can also be
+   a format string, and ARGS is "
   (let ((url (format nil +text-message-path+ room-id (txn-id client)))
         (body (list :|msgtype| "m.text"
-                    :|body| message)))
+                    :|body| (apply #'format (list* nil message args)))))
     (send (client url body :wrap make-basic-json) t)))
 
 
@@ -439,6 +441,7 @@
                   room-id
                   *response-status*
                   (flexi-streams:octets-to-string *response-body*)))))
+
 
 ;;; bot loop
 

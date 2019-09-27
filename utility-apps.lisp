@@ -115,6 +115,23 @@
                     (and like (search name (room-name room) :test #'string-equal)))
             :collect (if full room (room-id room)))))
 
+(defun client-contacts (client)
+  "Returns a list of all users this client knows about."
+  (let (contacts)
+    (loop :for room :being :the :hash-values :of (directory-table client) :do
+      (dolist (user (room-members room))
+        (pushnew user contacts :test #'equal)))
+    contacts))
+
+(defun find-contact (client name &key like)
+  "Finds a specific matrix ID by name. If LIKE is NIL, returns a string equal to
+   NAME if this client has a contact with that NAME, or NIL otherwise. If LIKE
+   is not NIL returns the first matrix ID found that contains NAME as a
+   substring, or NIL if no such matrix ID is found."
+  (find-if (lambda (contact)
+             (or (equal name contact)
+                 (and like (search name contact :test #'string-equal))))
+        (client-contacts client)))
 
 ;;; Basic Joiner Bot
 

@@ -105,6 +105,8 @@
   (:documentation "Implemented on handlers that need to respond to events.")
   (:method ((client client) room event) t))
 
+
+
 (defgeneric clean-up (client)
   (:documentation "To be run before the client crashes or is killed.")
   (:method ((client client))
@@ -161,7 +163,8 @@
   (rooms :|rooms|)
   (presence :|presence|)
   (joined-rooms :|rooms| :|join|)
-  (invited-rooms :|rooms| :|invite|))
+  (invited-rooms :|rooms| :|invite|)
+  (account-data-events :|account_data| :|events|))
 
 (def-json-wrap timeline-event
   (event-content :|content|)
@@ -215,6 +218,10 @@
   (state-key :|state_key|)
   (event-type :|type|)
   (sender :|sender|))
+
+(def-json-wrap account-data-event
+  (event-content :|content|)
+  (event-type :|type|))
 
 (def-json-wrap basic-json)
 
@@ -364,8 +371,9 @@
 (defvar *notice-message-event* (make-notice-message-event :data nil))
 (defvar *location-message-event* (make-location-message-event :data nil))
 (defvar *state-event* (make-room-state-event :data nil))
+(defvar *account-data-event* (make-account-data-event :data nil))
 
-(defun categorize-and-set-event (ob)
+(defun categorize-and-set-timeline-event (ob)
   (cond
     ((text-message-event-p* ob)
      (setf (timeline-event-data *text-message-event*) ob)
@@ -405,13 +413,12 @@
       (dolist (ob (getob room :|timeline| :|events|))
         (handle-event client
                       room-id
-                      (categorize-and-set-event ob)))
+                      (categorize-and-set-timeline-event ob)))
 
       ;; handle state chnage events (aka state events)
       (dolist (ob (getob room :|state| :|events|))
         (setf (room-state-event-data *state-event*) ob)
         (handle-event client room-id *state-event*))))
-
 
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
@@ -420,6 +427,11 @@
       (dolist (ob (getob room :|invite_state| :|events|))
         (setf (invitation-event-data invite-event) ob)
         (handle-event client room-id invite-event)))))
+
+(defun process-account-data-events (client)
+  (dolist (ob (account-data-events *response-object*))
+    (setf (account-data-event-data *account-data-event*) ob)
+    (handle-account-event client *account-data-event*)))
 
 
 (defun send-text-message (client room-id message &rest args)

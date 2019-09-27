@@ -101,11 +101,9 @@
   (when (and (hardcopy client) (probe-file (hardcopy client)))
     (load-client-state client)))
 
-(defgeneric handle-event (client room event)
+(defgeneric handle-event (client event &optional room-id)
   (:documentation "Implemented on handlers that need to respond to events.")
-  (:method ((client client) room event) t))
-
-
+  (:method ((client client) event &optional room-id) t))
 
 (defgeneric clean-up (client)
   (:documentation "To be run before the client crashes or is killed.")
@@ -412,26 +410,27 @@
       ;; handle the timeline events (aka room events)
       (dolist (ob (getob room :|timeline| :|events|))
         (handle-event client
-                      room-id
-                      (categorize-and-set-timeline-event ob)))
+                      (categorize-and-set-timeline-event ob)
+                      room-id))
 
       ;; handle state chnage events (aka state events)
       (dolist (ob (getob room :|state| :|events|))
         (setf (room-state-event-data *state-event*) ob)
-        (handle-event client room-id *state-event*))))
+        (handle-event client *state-event* room-id))))
 
+;; TODO add global cache variable for invite event
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
     (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
       (setf room-id (symbol-name room-id))
       (dolist (ob (getob room :|invite_state| :|events|))
         (setf (invitation-event-data invite-event) ob)
-        (handle-event client room-id invite-event)))))
+        (handle-event client invite-event room-id)))))
 
 (defun process-account-data-events (client)
   (dolist (ob (account-data-events *response-object*))
     (setf (account-data-event-data *account-data-event*) ob)
-    (handle-account-event client *account-data-event*)))
+    (handle-event client *account-data-event*)))
 
 
 (defun send-text-message (client room-id message &rest args)

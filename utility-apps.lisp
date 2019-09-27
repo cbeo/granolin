@@ -17,7 +17,7 @@
   (loop :for (k . v) :in alist
         :do (format stream "~a: ~a~%" k v)))
 
-(defmethod handle-event :after ((log message-log) room (event timeline-event))
+(defmethod handle-event :after ((log message-log) (event timeline-event) &optional room)
   (print "Joined Room Message/Timeline Event" (output log))  
   (let ((fields `(("room" . ,room)
                   ("sender" . ,(sender event))
@@ -29,7 +29,7 @@
     (terpri (output log))))
 
 
-(defmethod handle-event :after ((log message-log) room (event room-state-event))
+(defmethod handle-event :after ((log message-log) (event room-state-event) &optional room)
   (print "Joined Room State Event" (output log))  
   (let ((fields `(("room" . ,room)
                   ("sender" . ,(sender event))
@@ -40,7 +40,7 @@
     (terpri (output log))))
 
 
-(defmethod handle-event :after ((log message-log) room (event invitation-event))
+(defmethod handle-event :after ((log message-log) (event invitation-event) &optional room)
   (print "Invitation Event" (output log))
   (let ((fields `(("room" . ,room)
                   ("sender" . ,(sender event))
@@ -88,7 +88,8 @@
 (defun update-room-aliases (client room-id member)
   (declare (ignore client room-id member)))
 
-(defmethod handle-event :after ((client server-directory) room-id (event room-state-event))
+(defmethod handle-event :after
+    ((client server-directory) (event room-state-event) &optional room-id)
   (cond
     ((string= "m.room.name" (event-type event))
      (update-room-name client room-id (room-name event)))
@@ -137,7 +138,7 @@
 
 (defclass auto-joiner () ())
 
-(defmethod handle-event :after ((client auto-joiner) room-id (event invitation-event))
+(defmethod handle-event :after ((client auto-joiner) (event invitation-event) &optional room-id)
   (when (equal "invite"
                (getf (event-content event) :|join_rule|))
     (join-room client room-id)))

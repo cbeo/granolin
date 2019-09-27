@@ -1,11 +1,17 @@
 (in-package :granolin)
 
-(defmacro let-cond ((var) &body forms)
-  `(let (,var)
-     (cond
-       ,@(loop :for form :in forms
-               :collect (destructuring-bind (test . actions) form
-                          `((setf ,var ,test) ,@actions))))))
+(defmacro let-cond (&body forms)
+  (let ((tmp-var (gensym)))
+    `(let (,tmp-var)
+       (cond
+         ,@(loop :for (var test . body) :in forms
+                 :if (eq var t)
+                   :collect (list* t (cons test body))
+                 :else
+                   :collect `((setf ,tmp-var ,test)
+                              (let ((,var ,tmp-var))
+                                ,@body)))))))
+
 (defmacro let-when ((var test) &body body)
   `(let ((,var ,test))
      (when ,test ,@body)))

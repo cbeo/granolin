@@ -168,6 +168,12 @@
                      (and like (search name contact :test #'string-equal))))
                (client-contacts client))))
 
+(defun ensure-direct-room (client name &key like)
+  (let-if (room (find-contact client name :like like :get-direct-room t))
+          room
+          (create-direct-message-room client name :like like)))
+
+
 
 ;;; Basic Joiner Bot
 

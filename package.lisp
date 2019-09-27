@@ -66,6 +66,7 @@
    #:sync
    #:send-text-message
    #:join-room
+   #:create-direct-message-room
 
    ;; bot control
    #:start

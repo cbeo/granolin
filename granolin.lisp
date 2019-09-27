@@ -424,6 +424,19 @@
                   (flexi-streams:octets-to-string *response-body*)))))
 
 
+(defun create-direct-message-room (client name)
+  "Attempt to create a direct message room with the given name. If successful
+   the room id is returned. Returns nil and prints to *error-output* if
+   unsuccessful."
+  (let ((body (list :|invite| (list (user-id client) name)
+                    :|is_direct| t)))
+    (send (client +create-room-path+ body :method :post :wrap make-basic-json)
+          (getob (basic-json-data *response-object*) :|room_id|)
+          (format *error-output*
+                  "FAILED to create private chat with ~a~%HTTP response: ~a ~a~%"
+                  name *response-status*
+                  (flexi-streams:octets-to-string *response-body)))))
+
 ;;; bot loop
 
 (defun start (client)

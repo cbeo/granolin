@@ -182,7 +182,8 @@
     (t ;; otherwise send a direct message to each participant and make a new match instance
      (let ((challenger-room (ensure-direct-room bot challenger))
            (challenged-room (ensure-direct-room bot challenged)))
-       (if (and (send-text-message
+       (if (and challenger-room challenged-room
+                (send-text-message
                  bot
                  challenger-room
                  "You have challenged ~a to roshambo. Reply with Rock, Paper, Scissors or Cancel."
@@ -204,7 +205,7 @@
            (send-text-message bot room-id "Some kind of problem starting a roshambo match :("))))))
 
 
-(defclass roshambo-bot (granolin:client granolin:server-directory roshambot) ())
+(defclass roshambo-bot (granolin:client granolin:server-directory roshambot auto-joiner) ())
 
 ;; (defmethod handle-event :after ((bot roshambot-bot) (ev timeline-event) &optional room-id)
 ;;   (format t "~a - ~a:~%  ~a~%" room-id (granolin::sender ev) (granolin:msg-body ev)))

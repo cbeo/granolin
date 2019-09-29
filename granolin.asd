@@ -9,5 +9,6 @@
   :depends-on (#:drakma #:jonathan)
   :components ((:file "package")
                (:file "macros")
+               (:file "utils")
                (:file "granolin")
                (:file "utility-apps")))

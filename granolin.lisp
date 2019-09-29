@@ -193,12 +193,14 @@
 (def-json-wrap basic-json)
 
 
-;;; URI constants for interacting with the Matrix API
+;;; URI constants (format) strings for interacting with the Matrix API
 
 (defparameter +login-path+ "/_matrix/client/r0/login")
 (defparameter +sync-path+ "/_matrix/client/r0/sync")
 (defparameter +join-room-path+ "/_matrix/client/r0/rooms/~a/join")
 (defparameter +text-message-path+ "/_matrix/client/r0/rooms/~a/send/m.room.message/~a")
+(defparameter +create-room-path+ "/_matrix/client/r0/createRoom")
+(defparameter +update-account-data-path+ "/_matrix/client/r0/user/~a/account_data/~a")
 
 ;;; Utility functions and macros for making HTTP requests to the MATRIX API
 
@@ -292,14 +294,14 @@
 
           (progn
             (setf (user-id client)
-                  (user-id *response-body*))
+                  (user-id *response-object*))
             (setf (access-token client)
                   (access-token *response-object*)))
 
           (error "Attempt to login ~a : ~a failed with ~a"
                  user password *response-status*))))
 
-(defun sync (client &key (full-state "false"))
+(defun sync (client &key full-state extra-params)
   "Synchronize client state with server state. CLIENT should have a valid
   ACCESS-TOKEN slot value (i.e. the CLIENT should have been logged in).
 
@@ -310,9 +312,12 @@
   https://matrix.org/docs/spec/client_server/r0.5.0#get-matrix-client-r0-sync
   "
   (let (params)
-    (push (cons "full_state" full-state) params)
+    (setf params (append params extra-params))
+    (when full-state
+      (push (cons "full_state" "true") params))
     (push (cons "timeout" (format nil "~a" (timeout client))) params)
-    (when (next-batch client)
+    (when (and (next-batch client)
+               (not full-state))
       (push (cons "since" (next-batch client))  params))
 
     (fetch (client +sync-path+ :params params :wrap make-sync-response)
@@ -321,6 +326,7 @@
                   *response-status* +sync-path+))))
 
 (defun handle-sync-response (client)
+  (print *response-object*)
   (setf (next-batch client)
         (next-batch *response-object*))
   (process-joined-events client)
@@ -424,18 +430,20 @@
                   (flexi-streams:octets-to-string *response-body*)))))
 
 
-(defun create-direct-message-room (client name)
-  "Attempt to create a direct message room with the given name. If successful
-   the room id is returned. Returns nil and prints to *error-output* if
-   unsuccessful."
-  (let ((body (list :|invite| (list (user-id client) name)
-                    :|is_direct| t)))
-    (send (client +create-room-path+ body :method :post :wrap make-basic-json)
-          (getob (basic-json-data *response-object*) :|room_id|)
+(defun update-account-data (client m-type data)
+  "Serializes the PLIST DATA as JSON and PUTs it in account_data at the given M-TYPE.
+
+   E.g. M-TYPE might be the string m.direct"
+  (let ((url  (format nil
+                      +update-account-data-path+
+                      (user-id client)
+                      m-type)))
+    (send (client url data :method :put :wrap make-basic-json)
+          t
           (format *error-output*
-                  "FAILED to create private chat with ~a~%HTTP response: ~a ~a~%"
-                  name *response-status*
-                  (flexi-streams:octets-to-string *response-body)))))
+                  "FAILED to update user account data.~%HTTP respponse: ~a ~a~%"
+                  *response-status*
+                  (flexi-streams:octets-to-string *response-body*)))))
 
 ;;; bot loop
 

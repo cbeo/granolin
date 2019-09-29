@@ -8,47 +8,65 @@
   ((output
     :accessor output
     :initarg :output
-    :initform (error "Message Log requires an output stream")
+    :initform *standard-output*
     :type stream
-    :documentation "An output stream to which messages are logged."
-    )))
+    :documentation "An output stream to which messages are logged.")
+   (logging-p
+    :accessor logging-p
+    :initform t) ))
 
 (defun print-assoc (alist &optional (stream t))
   (loop :for (k . v) :in alist
         :do (format stream "~a: ~a~%" k v)))
 
 (defmethod handle-event :after ((log message-log) (event timeline-event) &optional room)
-  (print "Joined Room Message/Timeline Event" (output log))  
-  (let ((fields `(("room" . ,room)
-                  ("sender" . ,(sender event))
-                  ("event type" . ,(event-type event))
-                  ("message type" . ,(msg-type event))
-                  ("messge body" . ,(msg-body event))
-                  ("content" . ,(event-content event)))))
-    (print-assoc fields (output log))
-    (terpri (output log))))
+  (when (logging-p log)
+    (print "Joined Room Message/Timeline Event" (output log))
+    (terpri (output log))
+    (let ((fields `(("room" . ,room)
+                    ("sender" . ,(sender event))
+                    ("event type" . ,(event-type event))
+                    ("message type" . ,(msg-type event))
+                    ("messge body" . ,(msg-body event))
+                    ("content" . ,(event-content event)))))
+      (print-assoc fields (output log))
+      (terpri (output log)))))
 
 
 (defmethod handle-event :after ((log message-log) (event room-state-event) &optional room)
-  (print "Joined Room State Event" (output log))  
-  (let ((fields `(("room" . ,room)
-                  ("sender" . ,(sender event))
-                  ("event type" . ,(event-type event))
-                  ("state key" . ,(state-key event))
-                  ("content" . ,(event-content event)))))
-    (print-assoc fields (output log))
+  (when (logging-p log)
+    (print "Joined Room State Event" (output log))
+    (terpri (output log))
+    (let ((fields `(("room" . ,room)
+                    ("sender" . ,(sender event))
+                    ("event type" . ,(event-type event))
+                    ("state key" . ,(state-key event))
+                    ("content" . ,(event-content event)))))
+      (print-assoc fields (output log))
+      (terpri (output log)))))
+
+(defmethod handle-event :after ((log message-log) (event account-data-event) &optional room)
+  (declare (ignore room))
+  (when (logging-p log)
+    (print "Account Data Event" (output log))
+    (terpri (output log))
+    (print-assoc `(("content" . ,(event-content event))
+                   ("type" . ,(event-type event)))
+                 (output log))
     (terpri (output log))))
 
 
 (defmethod handle-event :after ((log message-log) (event invitation-event) &optional room)
-  (print "Invitation Event" (output log))
-  (let ((fields `(("room" . ,room)
-                  ("sender" . ,(sender event))
-                  ("event type" . ,(event-type event))
-                  ("state key" . ,(state-key event))
-                  ("content" . ,(event-content event)))))
-    (print-assoc fields (output log))
-    (terpri (output log))))
+  (when (logging-p log)
+    (print "Invitation Event" (output log))
+    (terpri (output log))
+    (let ((fields `(("room" . ,room)
+                    ("sender" . ,(sender event))
+                    ("event type" . ,(event-type event))
+                    ("state key" . ,(state-key event))
+                    ("content" . ,(event-content event)))))
+      (print-assoc fields (output log))
+      (terpri (output log)))))
 
 
 ;;; A Room and User Directory Bot
@@ -64,7 +82,11 @@
   ((directory-table
     :reader directory-table
     :initform (make-hash-table :test 'equal)
-    :documentation "A table mapping room IDs to room struct instances.")))
+    :documentation "A table mapping room IDs to room struct instances.")
+   (m-direct-event-content
+    :accessor m-direct-event-content
+    :initform nil
+    :documentation "A cached copy of the current m.direct event")))
 
 (defun get-room (client room-id)
   "Get the SERVER-ROOM struct keyed by ROOM-ID, or return NIL."
@@ -106,6 +128,7 @@
                                 &optional room-id)
   (declare (ignore room-id))
   (when (equal "m.direct" (event-type event))
+    (setf (m-direct-event-content client) (event-content event))
     (loop :for (user room-ids . more) :on (event-content event) :by #'cddr :do
       (dolist (room-id room-ids)
         (mark-as-direct client room-id)))))
@@ -169,10 +192,40 @@
                (client-contacts client))))
 
 (defun ensure-direct-room (client name &key like)
-  (let-if (room (find-contact client name :like like :get-direct-room t))
-          room
-          (create-direct-message-room client name :like like)))
+  "Returns the room ID of a direct chat room between the bot and the user with NAME. If
+   no direct chat currently exists between the bot and the user, then an attempt will
+   be made to create one before returning the room id."
+  (let-cond
+    (room (find-contact client name :like like :get-direct-room t)
+          room)
+    (room (find-contact client name :like like)
+          (create-direct-message-room client room))))
 
+
+(defun create-direct-message-room (client name)
+  "Attempt to create a direct message room with the given name. If successful
+   the room id is returned. Returns nil and prints to *error-output* if
+   unsuccessful."
+  (let ((body (list :|invite| (list name)
+                    :|is_direct| t)))
+    (send (client +create-room-path+ body :method :post :wrap make-basic-json)
+          ;; if successful
+          (let* ((room-id (getob (basic-json-data *response-object*) :|room_id|))
+                 (user-key (string->json-key name))
+                 (direct (m-direct-event-content client)))
+
+            ;; add the room to the m.direct content for the user
+            (if (getf direct user-key)
+                (push (getf direct user-key) room-id)
+                (setf (getf direct user-key) (list room-id)))
+
+            (when (update-account-data client "m.direct" direct)
+              room-id))
+          ;; else
+          (format *error-output*
+                  "FAILED to create private chat with ~a~%HTTP response: ~a ~a~%"
+                  name *response-status*
+                  (flexi-streams:octets-to-string *response-body*)))))
 
 
 ;;; Basic Joiner Bot

@@ -24,9 +24,20 @@
    #:handle-event
    #:clean-up
 
-   ;; utility classes
-   #:message-log
-   #:server-directory
+   ;; utility classes & their APIS
+   #:message-log ; plugin 
+   #:server-directory ; plugin
+   #:server-room      ; data class
+   #:room-members
+   #:direct-p
+   #:get-room
+   #:get-direct-room
+   #:find-rooms-named
+   #:client-contacts
+   #:room-member-p
+   #:find-contact
+   #:ensure-direct-room
+
    #:auto-joiner
 
    ;; json data utilities & accessors

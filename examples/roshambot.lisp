@@ -62,8 +62,7 @@
   (let ((text (granolin:msg-body event)))
     (let-cond
       (challenged (you-wanna-piece-of-this!? text)
-                  (format t "should be challenging: ~a~%" text)
-                  (handle-new-challenge bot room-id (granolin:sender event) challenged))
+                   (handle-new-challenge bot room-id (granolin:sender event) challenged))
       (roshambo-match (challenger-made-move!? bot room-id (granolin::sender event) text)
                       (handle-match-state-change bot roshambo-match))
       (roshambo-match (challenged-made-move!? bot room-id (granolin::sender event) text)
@@ -163,29 +162,46 @@
   (setf (live-matches bot)
         (delete roshambo-match (live-matches bot))))
 
-(defun handle-new-challenge (bot room-id challenger challenged)
-  (let ((challenger-room (ensure-direct-room bot challenger))
-        (challenged-room (ensure-direct-room bot challenged :like t)))
-    (if (and (send-text-message
-              bot
-              challenger-room
-              "You have challenged ~a to roshambo. Reply with Rock, Paper, Scissors or Cancel."
-              challenged)
-             (send-text-message
-              bot
-              challenged-room
-              "~a has challenged you to roshambo. Reply with Rock, Paper, Scissors, or Cancel."
-              challenger))
-        (push (make-roshambo-match :room room-id
-                                   :challenger challenger
-                                   :challenger-room challenger-room
-                                   :challenger-move nil
-                                   :challenged (find-contact bot challenged :like t)
-                                   :challenged-room challenged-room
-                                   :challenged-move nil)
-              (live-matches bot))
+(defun find-match-with-user (bot user)
+  (find-if (lambda (m) (or (equal user (roshambo-match-challenger m))
+                           (equal user (roshambo-match-challenged m))))
+           (live-matches bot)))
 
-        (send-text-message bot room-id "Some kind of problem starting a roshambo match :("))))
+
+(defun handle-new-challenge (bot room-id challenger challenged)
+  (setf challenged (find-contact bot challenged :like t))
+  ;; if either user is already in a match, they shouldn't enter a second.
+  (cond ((find-match-with-user bot challenger)
+         (send-text-message bot room-id
+                            "Sorry, ~a is already in a match."
+                            (readable-username challenger)))
+        ((find-match-with-user bot challenged)
+         (send-text-message bot room-id
+                            "Sorry, ~a is already in a match."
+                            (readable-username challenged)))
+    (t ;; otherwise send a direct message to each participant and make a new match instance
+     (let ((challenger-room (ensure-direct-room bot challenger))
+           (challenged-room (ensure-direct-room bot challenged)))
+       (if (and (send-text-message
+                 bot
+                 challenger-room
+                 "You have challenged ~a to roshambo. Reply with Rock, Paper, Scissors or Cancel."
+                 (readable-username challenged))
+                (send-text-message
+                 bot
+                 challenged-room
+                 "~a has challenged you to roshambo. Reply with Rock, Paper, Scissors, or Cancel."
+                 (readable-username challenger)))
+           (push (make-roshambo-match :room room-id
+                                      :challenger challenger
+                                      :challenger-room challenger-room
+                                      :challenger-move nil
+                                      :challenged challenged 
+                                      :challenged-room challenged-room
+                                      :challenged-move nil)
+                 (live-matches bot))
+
+           (send-text-message bot room-id "Some kind of problem starting a roshambo match :("))))))
 
 
 (defclass roshambo-bot (granolin:client granolin:server-directory roshambot) ())

@@ -198,8 +198,8 @@
   (let-cond
     (room (find-contact client name :like like :get-direct-room t)
           room)
-    (room (find-contact client name :like like)
-          (create-direct-message-room client room))))
+    (full-name (find-contact client name :like like)
+               (create-direct-message-room client full-name))))
 
 
 (defun create-direct-message-room (client name)

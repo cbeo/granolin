@@ -37,6 +37,7 @@
    #:room-member-p
    #:find-contact
    #:ensure-direct-room
+   #:create-direct-message-room
 
    #:auto-joiner
 

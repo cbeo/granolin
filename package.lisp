@@ -11,6 +11,10 @@
    #:getob
    #:def-json-wrap
 
+   ;; utilities
+   #:string->json-key
+   #:readable-username
+
    ;; main class
    #:client
    #:homeserver

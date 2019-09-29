@@ -94,8 +94,10 @@
     (cancelled-by (roshambo-cancelled!? roshambo-match)
                   (send-text-message bot (roshambo-match-room roshambo-match)
                                      "The match between ~a and ~a was canceled by ~a."
-                                     (roshambo-match-challenger roshambo-match)
-                                     (roshambo-match-challenged roshambo-match)
+                                     (readable-username
+                                      (roshambo-match-challenger roshambo-match))
+                                     (readable-username
+                                      (roshambo-match-challenged roshambo-match))
                                      cancelled-by)
                   (kill-roshambo-match bot roshambo-match))
     (win-list (roshambo-has-winner!? roshambo-match)
@@ -103,10 +105,16 @@
                 (if (eql winner :draw) ; this is a draw move
                     (send-text-message bot (roshambo-match-room roshambo-match)
                                        "It's a draw! Both ~a and ~a picked ~a."
-                                       win-move loser lose-move)
+                                       (readable-username win-move)
+                                       (readable-username loser)
+                                       lose-move)
                     (send-text-message bot (roshambo-match-room roshambo-match)
                                        "~a's ~a beats ~a's ~a! ~a is the winner!~%"
-                                       winner win-move loser lose-move winner)))
+                                       (readable-username winner)
+                                       win-move
+                                       (readable-username loser)
+                                       lose-move
+                                       (readable-username winner))))
               (kill-roshambo-match bot roshambo-match))))
 
 

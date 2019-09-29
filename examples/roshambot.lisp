@@ -3,13 +3,13 @@
 (ql:quickload :cl-ppcre)
 
 (defpackage #:roshambot
-  (:use :cl)
-  (:import-from :granolin
-                :handle-event
-                :find-contact
-                :text-message-event
-                :send-text-message
-                :let-cond))
+  (:use :cl :granolin))
+  ;; (:import-from :granolin
+  ;;               :handle-event
+  ;;               :find-contact
+  ;;               :text-message-event
+  ;;               :send-text-message
+  ;;               :let-cond))
 
 (in-package :roshambot)
 
@@ -31,46 +31,170 @@
 (defstruct roshambo-match
   room
   challenger
-  challenger-state
+  challenger-room
+  challenger-move
   challenged
-  challenged-state)
+  challenged-room
+  challenged-move)
 
 (defclass roshambot ()
-  ((match-id
-   :accessor match-id
-   :initform 0)
-   (live-matches
+  ((live-matches
    :accessor live-matches
    :initform nil)))
 
 (defparameter +challenge-regex+
-  (ppcre:create-scanner "i challenge ([a-zA-Z0-9_.-]+) to roshambo"
+  (ppcre:create-scanner " ?i challenge ([a-zA-Z0-9_.-]+) to roshambo"
                         :case-insensitive-mode t))
 
 (defun you-wanna-piece-of-this!? (str)
   "If the string communicates one user's intention to challenge another to
   roshambo, returns the name of the user that has been challenged. Returns NIL otherwise."
-  (nth-value 1 (ppcre:scan-to-strings +challenge-regex+ str)))
+  (let-when (groups (nth-value 1 (ppcre:scan-to-strings +challenge-regex+ str)))
+    (aref groups 0)))
+
+(defparameter +roshambo-move-regex+
+  (ppcre:create-scanner "(rock|paper|scissors|cancel)" :case-insensitive-mode t))
+
+(defun roshambo-move!? (str)
+  (nth-value 0 (ppcre:scan-to-strings +roshambo-move-regex+ str)))
 
 (defmethod handle-event :after ((bot roshambot) (event text-message-event) &optional room-id)
-  (let ((text (msg-body event)))
+  (let ((text (granolin:msg-body event)))
     (let-cond
       (challenged (you-wanna-piece-of-this!? text)
-                  (handle-new-challenge bot room-id (sender event) challenged)))))
+                  (format t "should be challenging: ~a~%" text)
+                  (handle-new-challenge bot room-id (granolin:sender event) challenged))
+      (roshambo-match (challenger-made-move!? bot room-id (granolin::sender event) text)
+                      (handle-match-state-change bot roshambo-match))
+      (roshambo-match (challenged-made-move!? bot room-id (granolin::sender event) text)
+                      (handle-match-state-change bot roshambo-match)))))
+
+(defun challenger-made-move!? (bot room-id sender text)
+  (let-when (roshambo-match (find room-id (live-matches bot)
+                                  :key #'roshambo-match-challenger-room
+                                  :test #'equal))
+    (unless (roshambo-match-challenger-move roshambo-match)
+      (let-when (move (and (equal sender (roshambo-match-challenger roshambo-match))
+                           (roshambo-move!? text)))
+        (setf (roshambo-match-challenger-move roshambo-match) move)
+        roshambo-match))))
+
+(defun challenged-made-move!? (bot room-id sender text)
+  (let-when (roshambo-match (find room-id (live-matches bot)
+                                  :key #'roshambo-match-challenged-room
+                                  :test #'equal))
+    (unless (roshambo-match-challenged-move roshambo-match)
+      (let-when (move (and (equal sender (roshambo-match-challenged roshambo-match))
+                           (roshambo-move!? text)))
+        (setf (roshambo-match-challenged-move roshambo-match) move)
+        roshambo-match))))
+
+(defun handle-match-state-change (bot roshambo-match)
+  (let-cond
+    (cancelled-by (roshambo-cancelled!? roshambo-match)
+                  (send-text-message bot (roshambo-match-room roshambo-match)
+                                     "The match between ~a and ~a was canceled by ~a."
+                                     (roshambo-match-challenger roshambo-match)
+                                     (roshambo-match-challenged roshambo-match)
+                                     cancelled-by)
+                  (kill-roshambo-match bot roshambo-match))
+    (win-list (roshambo-has-winner!? roshambo-match)
+              (destructuring-bind (winner win-move loser lose-move) win-list
+                (if (eql winner :draw) ; this is a draw move
+                    (send-text-message bot (roshambo-match-room roshambo-match)
+                                       "It's a draw! Both ~a and ~a picked ~a."
+                                       win-move loser lose-move)
+                    (send-text-message bot (roshambo-match-room roshambo-match)
+                                       "~a's ~a beats ~a's ~a! ~a is the winner!~%"
+                                       winner win-move loser lose-move winner)))
+              (kill-roshambo-match bot roshambo-match))))
+
+
+(defun roshambo-cancelled!? (rmatch)
+  (cond ((and (roshambo-match-challenger-move rmatch)
+              (string-equal "cancel" (roshambo-match-challenger-move rmatch)))
+         (roshambo-match-challenger rmatch))
+
+        ((and (roshambo-match-challenged-move rmatch)
+             (string-equal "cancel" (roshambo-match-challenged-move rmatch)))
+         (roshambo-match-challenged rmatch))))
+
+(defun roshambo-has-winner!? (rsb)
+  (with-slots (challenger challenger-move challenged challenged-move) rsb
+    (when (and challenger-move challenged-move
+               (not (string-equal "cancel" challenger-move))
+               (not (string-equal "cancel" challenged-move)))
+      (cond ((string-equal challenger-move challenged-move)
+             (list :draw challenger challenged challenger-move)) ; both had same move
+            ((and (string-equal "rock" challenger-move)
+                  (string-equal "scissors" challenged-move))
+             (list challenger challenger-move challenged challenged-move))
+
+            ((and (string-equal "paper" challenger-move)
+                  (string-equal "rock" challenged-move))
+             (list challenger challenger-move challenged challenged-move))
+
+            ((and (string-equal "scissors" challenger-move)
+                  (string-equal "paper" challenged-move))
+             (list challenger challenger-move challenged challenged-move))
+
+            ((and (string-equal "rock" challenged-move)
+                  (string-equal "scissors" challenger-move))
+             (list challenged challenged-move challenger challenger-move))
+
+            ((and (string-equal "paper" challenged-move)
+                  (string-equal "rock" challenger-move))
+             (list challenged challenged-move challenger challenger-move))
+
+            ((and (string-equal "scissors" challenged-move)
+                  (string-equal "paper" challenger-move))
+             (list challenged challenged-move challenger challenger-move))))))
+
+
+(defun kill-roshambo-match (bot roshambo-match)
+  (setf (live-matches bot)
+        (delete roshambo-match (live-matches bot))))
 
 (defun handle-new-challenge (bot room-id challenger challenged)
-  (let-cond
-    (direct-chat (find-contact bot challenged :like t :get-direct-room t)
-                 
+  (let ((challenger-room (ensure-direct-room bot challenger))
+        (challenged-room (ensure-direct-room bot challenged :like t)))
+    (if (and (send-text-message
+              bot
+              challenger-room
+              "You have challenged ~a to roshambo. Reply with Rock, Paper, Scissors or Cancel."
+              challenged)
+             (send-text-message
+              bot
+              challenged-room
+              "~a has challenged you to roshambo. Reply with Rock, Paper, Scissors, or Cancel."
+              challenger))
+        (push (make-roshambo-match :room room-id
+                                   :challenger challenger
+                                   :challenger-room challenger-room
+                                   :challenger-move nil
+                                   :challenged (find-contact bot challenged :like t)
+                                   :challenged-room challenged-room
+                                   :challenged-move nil)
+              (live-matches bot))
 
-    )
+        (send-text-message bot room-id "Some kind of problem starting a roshambo match :("))))
 
 
-  (let-if (full-challenged (granolin::find-contact bot challenged :like t))
-          (make-new-challenge bot room-id challenger full-challenged)
-          (send-text-message client room-id
-                             "Hey ~a, I don't know of anybody named ~a"
-                             challenger challenged)))
+(defclass roshambo-bot (granolin:client granolin:server-directory roshambot) ())
 
+;; (defmethod handle-event :after ((bot roshambot-bot) (ev timeline-event) &optional room-id)
+;;   (format t "~a - ~a:~%  ~a~%" room-id (granolin::sender ev) (granolin:msg-body ev)))
+
+(defmethod handle-event :after ((bot roshambo-bot) (ev text-message-event) &optional room-id)
+  (format t "~a - ~a:~%  ~a~%" room-id (granolin::sender ev) (granolin:msg-body ev)))
+
+(defmethod handle-event :after ((bot roshambo-bot)
+                                (ev granolin::account-data-event)
+                                &optional room-id)
+  (format t "~a ~a" (event-type ev) (event-content ev)))
+
+
+(defvar *roshambot* (make-instance 'roshambo-bot
+                                   :homeserver "https://matrix.hrlo.world"))
 
 

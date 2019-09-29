@@ -124,6 +124,12 @@
      (update-room-aliases client room-id (room-aliases event)))))
 
 (defmethod handle-event :after ((client server-directory)
+                                (event timeline-event)
+                                &optional room-id)
+  (update-room-member client room-id (sender event)))
+
+
+(defmethod handle-event :after ((client server-directory)
                                 (event account-data-event)
                                 &optional room-id)
   (declare (ignore room-id))
@@ -131,10 +137,16 @@
     (setf (m-direct-event-content client) (event-content event))
     (loop :for (user room-ids . more) :on (event-content event) :by #'cddr :do
       (dolist (room-id room-ids)
-        (mark-as-direct client room-id)))))
+        (mark-as-direct client (symbol-name user) room-id)))))
 
-(defun mark-as-direct (client room-id)
-  (setf (direct-p (get-room client room-id)) t))
+(defun mark-as-direct (client user room-id)
+  (let-if (room (get-room client room-id))
+          (progn
+            (setf (direct-p room) t)
+            (push user (room-members room))
+            (setf (gethash room-id (directory-table client)) room))
+          (setf (gethash room-id (directory-table client))
+                (make-instance 'server-room :direct-p t :members (list user) :id room-id))))
 
 (defun name-of-room (client room-id)
   "Looks up the name of a room with ROOM-ID. Returns a string of NIL"
@@ -162,7 +174,7 @@
 (defun room-member-p (room name &key like)
   (some (lambda (memb) (or (equal name memb)
                            (and like (search name memb :test #'string-equal))))
-        (members room)))
+        (room-members room)))
 
 ;; TODO might be too nebulous.  Could be split up into two functions.
 (defun find-contact (client name &key like get-direct-room)
@@ -202,6 +214,8 @@
                (create-direct-message-room client full-name))))
 
 
+
+
 (defun create-direct-message-room (client name)
   "Attempt to create a direct message room with the given name. If successful
    the room id is returned. Returns nil and prints to *error-output* if
@@ -218,6 +232,8 @@
             (if (getf direct user-key)
                 (push (getf direct user-key) room-id)
                 (setf (getf direct user-key) (list room-id)))
+
+            (setf (m-direct-event-content client) direct) ; update it here
 
             (when (update-account-data client "m.direct" direct)
               room-id))

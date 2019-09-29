@@ -1,4 +1,4 @@
 (in-package :granolin )
 
 (defun string->json-key (s)
-  (format nil ":|~a|" s))
+  (read-from-string (format nil ":|~a|" s)))

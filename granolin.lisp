@@ -326,7 +326,6 @@
                   *response-status* +sync-path+))))
 
 (defun handle-sync-response (client)
-  (print *response-object*)
   (setf (next-batch client)
         (next-batch *response-object*))
   (process-joined-events client)

@@ -1,0 +1,18 @@
+* Granolin
+
+Build better bots, for matrix!
+
+* Event Handlers
+** Special Variables
+*** *room-id*
+
+The special variable =*room-id*= is available in your =handle-event= methods.
+It will have the value of the Matrix room id in which the event occured. It
+will be =nil= if the event is not a room state nor timeline/message event.
+
+For example:
+
+#+begin_src common-lisp
+(defmethod handle-event :after ((cli echo-bot) (ev text-message-event)) 
+    (send-text-message cli *room-id* (msg-body ev)))
+#+end_src

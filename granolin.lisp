@@ -16,7 +16,6 @@
     (incf id-source)
     (format nil "~a" id-source)))
 
-
 ;;; The main matrix client class
 
 (defclass client (id-source)
@@ -24,7 +23,8 @@
     :reader homeserver
     :initarg :homeserver
     :initform (error "HOMESERVER is required.")
-    :type string)
+    :type string
+    :documentation "The hostname this client connects to.")
    (user-id
     :accessor user-id
     :initarg :user-id
@@ -53,7 +53,11 @@
     :accessor next-batch
     :initform nil
     :type string
-    :documentation "Used on sync requests as the value of the SINCE parameter"))
+    :documentation "Used on sync requests as the value of the SINCE parameter")
+   (ssl
+    :reader ssl
+    :initform T
+    :documentation "Set to nil to use http protocol."))
   (:documentation "An instance of CLIENT holds the necessary state for
   interacting with a Matrix server. If HARDCOPY is supplied, the
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
@@ -101,9 +105,9 @@
   (when (and (hardcopy client) (probe-file (hardcopy client)))
     (load-client-state client)))
 
-(defgeneric handle-event (client event &optional room-id)
+(defgeneric handle-event (client event)
   (:documentation "Implemented on handlers that need to respond to events.")
-  (:method ((client client) event &optional room-id) t))
+  (:method ((client client) event) t))
 
 (defgeneric clean-up (client)
   (:documentation "To be run before the client crashes or is killed.")
@@ -122,6 +126,8 @@
   "Dynamic variable holding response status headers.")
 (defvar *response-object* nil
   "Dynamic variable holding a RESPONSE-OBJECT struct.")
+(defvar *room-id* nil
+  "Dynamic variable holding id of the room whose event is being processed.")
 
 ;;; Utilities for working with parsed JSON data
 
@@ -191,7 +197,6 @@
 
 ;; the basic-json struct is used as a kind of default in some places
 (def-json-wrap basic-json)
-
 
 ;;; URI constants (format) strings for interacting with the Matrix API
 
@@ -272,8 +277,11 @@
            ,on-ok)
          ,otherwise)))
 
-(defun make-matrix-path (client path)
-  (concatenate 'string (homeserver client) path))
+(defun make-matrix-path (client path )
+  (concatenate 'string
+               (if (ssl client) "https://" "http://")
+               (homeserver client)
+               path))
 
 ;;; API Calls
 
@@ -332,7 +340,6 @@
   (process-invited-room-events client)
   (process-account-data-events client))
 
-
 ;; The following globals are private and are recycled per call to sync
 (defvar *timeline-event* (make-timeline-event :data nil))
 (defvar *text-message-event* (make-text-message-event :data nil))
@@ -376,37 +383,34 @@
      (setf (timeline-event-data *timeline-event*) ob)
      *timeline-event*)))
 
-
 (defun process-joined-events (client)
   (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
-      ;; room-id should be a string
-      (setf room-id (symbol-name room-id))
+    (let ((*room-id* (symbol-name room-id))) ;; room-id should be a string
 
       ;; handle the timeline events (aka room events)
       (dolist (ob (getob room :|timeline| :|events|))
         (handle-event client
-                      (categorize-and-set-timeline-event ob)
-                      room-id))
+                      (categorize-and-set-timeline-event ob)))
 
       ;; handle state chnage events (aka state events)
       (dolist (ob (getob room :|state| :|events|))
         (setf (room-state-event-data *state-event*) ob)
-        (handle-event client *state-event* room-id))))
+        (handle-event client *state-event*)))))
 
 ;; TODO add global cache variable for invite event
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
     (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
-      (setf room-id (symbol-name room-id))
-      (dolist (ob (getob room :|invite_state| :|events|))
-        (setf (invitation-event-data invite-event) ob)
-        (handle-event client invite-event room-id)))))
+      (let ((*room-id* (symbol-name room-id)))
+
+        (dolist (ob (getob room :|invite_state| :|events|))
+          (setf (invitation-event-data invite-event) ob)
+          (handle-event client invite-event))))))
 
 (defun process-account-data-events (client)
   (dolist (ob (account-data-events *response-object*))
     (setf (account-data-event-data *account-data-event*) ob)
     (handle-event client *account-data-event*)))
-
 
 (defun send-text-message (client room-id message &rest args)
   "Sends the MESSAGE (a string) to the room with id ROOM-ID. MESSAGE can also be
@@ -415,7 +419,6 @@
         (body (list :|msgtype| "m.text"
                     :|body| (apply #'format (list* nil message args)))))
     (send (client url body :wrap make-basic-json) t)))
-
 
 (defun join-room (client room-id)
   "Attempts to join the client to the room with ROOM-ID."
@@ -427,7 +430,6 @@
                   room-id
                   *response-status*
                   (flexi-streams:octets-to-string *response-body*)))))
-
 
 (defun update-account-data (client m-type data)
   "Serializes the PLIST DATA as JSON and PUTs it in account_data at the given M-TYPE.

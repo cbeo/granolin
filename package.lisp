@@ -88,4 +88,6 @@
    #:start
    #:stop
 
+   ;; special variables
+   #:*room-id*
    ))

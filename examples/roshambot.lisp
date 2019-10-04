@@ -4,12 +4,6 @@
 
 (defpackage #:roshambot
   (:use :cl :granolin))
-  ;; (:import-from :granolin
-  ;;               :handle-event
-  ;;               :find-contact
-  ;;               :text-message-event
-  ;;               :send-text-message
-  ;;               :let-cond))
 
 (in-package :roshambot)
 
@@ -58,14 +52,14 @@
 (defun roshambo-move!? (str)
   (nth-value 0 (ppcre:scan-to-strings +roshambo-move-regex+ str)))
 
-(defmethod handle-event :after ((bot roshambot) (event text-message-event) &optional room-id)
+(defmethod handle-event :after ((bot roshambot) (event text-message-event))
   (let ((text (granolin:msg-body event)))
     (let-cond
       (challenged (you-wanna-piece-of-this!? text)
-                   (handle-new-challenge bot room-id (granolin:sender event) challenged))
-      (roshambo-match (challenger-made-move!? bot room-id (granolin::sender event) text)
+                   (handle-new-challenge bot *room-id* (granolin:sender event) challenged))
+      (roshambo-match (challenger-made-move!? bot *room-id* (granolin::sender event) text)
                       (handle-match-state-change bot roshambo-match))
-      (roshambo-match (challenged-made-move!? bot room-id (granolin::sender event) text)
+      (roshambo-match (challenged-made-move!? bot *room-id* (granolin::sender event) text)
                       (handle-match-state-change bot roshambo-match)))))
 
 (defun challenger-made-move!? (bot room-id sender text)
@@ -207,19 +201,14 @@
 
 (defclass roshambo-bot (granolin:client granolin:server-directory roshambot auto-joiner) ())
 
-;; (defmethod handle-event :after ((bot roshambot-bot) (ev timeline-event) &optional room-id)
-;;   (format t "~a - ~a:~%  ~a~%" room-id (granolin::sender ev) (granolin:msg-body ev)))
+(defmethod handle-event :after ((bot roshambo-bot) (ev text-message-event))
+  (format t "~a - ~a:~%  ~a~%" *room-id* (granolin::sender ev) (granolin:msg-body ev)))
 
-(defmethod handle-event :after ((bot roshambo-bot) (ev text-message-event) &optional room-id)
-  (format t "~a - ~a:~%  ~a~%" room-id (granolin::sender ev) (granolin:msg-body ev)))
-
-(defmethod handle-event :after ((bot roshambo-bot)
-                                (ev granolin::account-data-event)
-                                &optional room-id)
+(defmethod handle-event :after ((bot roshambo-bot) (ev granolin::account-data-event))
   (format t "~a ~a" (event-type ev) (event-content ev)))
 
-
-(defvar *roshambot* (make-instance 'roshambo-bot
-                                   :homeserver "https://matrix.hrlo.world"))
-
-
+;; creates and authenticates the bot, returns the bot instance
+(defun roshambot (homeserver user password)
+  (let ((bot (make-instance 'roshambo-bot :homeserver homeserver)))
+    (login bot user password)
+    bot))

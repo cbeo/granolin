@@ -19,11 +19,11 @@
   (loop :for (k . v) :in alist
         :do (format stream "~a: ~a~%" k v)))
 
-(defmethod handle-event :after ((log message-log) (event timeline-event) &optional room)
+(defmethod handle-event :after ((log message-log) (event timeline-event))
   (when (logging-p log)
     (print "Joined Room Message/Timeline Event" (output log))
     (terpri (output log))
-    (let ((fields `(("room" . ,room)
+    (let ((fields `(("room" . ,*room-id*)
                     ("sender" . ,(sender event))
                     ("event type" . ,(event-type event))
                     ("message type" . ,(msg-type event))
@@ -33,11 +33,11 @@
       (terpri (output log)))))
 
 
-(defmethod handle-event :after ((log message-log) (event room-state-event) &optional room)
+(defmethod handle-event :after ((log message-log) (event room-state-event))
   (when (logging-p log)
     (print "Joined Room State Event" (output log))
     (terpri (output log))
-    (let ((fields `(("room" . ,room)
+    (let ((fields `(("room" . ,*room-id*)
                     ("sender" . ,(sender event))
                     ("event type" . ,(event-type event))
                     ("state key" . ,(state-key event))
@@ -45,8 +45,7 @@
       (print-assoc fields (output log))
       (terpri (output log)))))
 
-(defmethod handle-event :after ((log message-log) (event account-data-event) &optional room)
-  (declare (ignore room))
+(defmethod handle-event :after ((log message-log) (event account-data-event))
   (when (logging-p log)
     (print "Account Data Event" (output log))
     (terpri (output log))
@@ -56,11 +55,11 @@
     (terpri (output log))))
 
 
-(defmethod handle-event :after ((log message-log) (event invitation-event) &optional room)
+(defmethod handle-event :after ((log message-log) (event invitation-event))
   (when (logging-p log)
     (print "Invitation Event" (output log))
     (terpri (output log))
-    (let ((fields `(("room" . ,room)
+    (let ((fields `(("room" . ,*room-id*)
                     ("sender" . ,(sender event))
                     ("event type" . ,(event-type event))
                     ("state key" . ,(state-key event))
@@ -110,29 +109,22 @@
 (defun update-room-aliases (client room-id member)
   (declare (ignore client room-id member)))
 
-(defmethod handle-event :after ((client server-directory)
-                                (event room-state-event)
-                                &optional room-id)
+(defmethod handle-event :after ((client server-directory) (event room-state-event))
   (cond
     ((string= "m.room.name" (event-type event))
-     (update-room-name client room-id (room-name event)))
+     (update-room-name client *room-id* (room-name event)))
 
     ((string= "m.room.member" (event-type event))
-     (update-room-member client room-id (sender event)))
+     (update-room-member client *room-id* (sender event)))
 
     ((string= "m.room.aliases" (event-type event))
-     (update-room-aliases client room-id (room-aliases event)))))
+     (update-room-aliases client *room-id* (room-aliases event)))))
 
-(defmethod handle-event :after ((client server-directory)
-                                (event timeline-event)
-                                &optional room-id)
-  (update-room-member client room-id (sender event)))
+(defmethod handle-event :after ((client server-directory) (event timeline-event))
+  (update-room-member client *room-id* (sender event)))
 
 
-(defmethod handle-event :after ((client server-directory)
-                                (event account-data-event)
-                                &optional room-id)
-  (declare (ignore room-id))
+(defmethod handle-event :after ((client server-directory) (event account-data-event))
   (when (equal "m.direct" (event-type event))
     (setf (m-direct-event-content client) (event-content event))
     (loop :for (user room-ids . more) :on (event-content event) :by #'cddr :do
@@ -248,8 +240,8 @@
 
 (defclass auto-joiner () ())
 
-(defmethod handle-event :after ((client auto-joiner) (event invitation-event) &optional room-id)
+(defmethod handle-event :after ((client auto-joiner) (event invitation-event))
   (when (equal "invite"
                (getf (event-content event) :|join_rule|))
-    (join-room client room-id)))
+    (join-room client *room-id*)))
 

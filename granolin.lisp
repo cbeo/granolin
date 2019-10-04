@@ -105,9 +105,9 @@
   (when (and (hardcopy client) (probe-file (hardcopy client)))
     (load-client-state client)))
 
-(defgeneric handle-event (client event &optional room-id)
+(defgeneric handle-event (client event)
   (:documentation "Implemented on handlers that need to respond to events.")
-  (:method ((client client) event &optional room-id) t))
+  (:method ((client client) event) t))
 
 (defgeneric clean-up (client)
   (:documentation "To be run before the client crashes or is killed.")
@@ -126,6 +126,8 @@
   "Dynamic variable holding response status headers.")
 (defvar *response-object* nil
   "Dynamic variable holding a RESPONSE-OBJECT struct.")
+(defvar *room-id* nil
+  "Dynamic variable holding id of the room whose event is being processed.")
 
 ;;; Utilities for working with parsed JSON data
 
@@ -383,28 +385,27 @@
 
 (defun process-joined-events (client)
   (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
-      ;; room-id should be a string
-      (setf room-id (symbol-name room-id))
+    (let ((*room-id* (symbol-name room-id))) ;; room-id should be a string
 
       ;; handle the timeline events (aka room events)
       (dolist (ob (getob room :|timeline| :|events|))
         (handle-event client
-                      (categorize-and-set-timeline-event ob)
-                      room-id))
+                      (categorize-and-set-timeline-event ob)))
 
       ;; handle state chnage events (aka state events)
       (dolist (ob (getob room :|state| :|events|))
         (setf (room-state-event-data *state-event*) ob)
-        (handle-event client *state-event* room-id))))
+        (handle-event client *state-event*)))))
 
 ;; TODO add global cache variable for invite event
 (defun process-invited-room-events (client)
   (let ((invite-event (make-invitation-event :data nil)))
     (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
-      (setf room-id (symbol-name room-id))
-      (dolist (ob (getob room :|invite_state| :|events|))
-        (setf (invitation-event-data invite-event) ob)
-        (handle-event client invite-event room-id)))))
+      (let ((*room-id* (symbol-name room-id)))
+
+        (dolist (ob (getob room :|invite_state| :|events|))
+          (setf (invitation-event-data invite-event) ob)
+          (handle-event client invite-event))))))
 
 (defun process-account-data-events (client)
   (dolist (ob (account-data-events *response-object*))

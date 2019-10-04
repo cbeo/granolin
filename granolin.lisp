@@ -16,7 +16,6 @@
     (incf id-source)
     (format nil "~a" id-source)))
 
-
 ;;; The main matrix client class
 
 (defclass client (id-source)
@@ -24,7 +23,8 @@
     :reader homeserver
     :initarg :homeserver
     :initform (error "HOMESERVER is required.")
-    :type string)
+    :type string
+    :documentation "The hostname this client connects to.")
    (user-id
     :accessor user-id
     :initarg :user-id
@@ -53,7 +53,11 @@
     :accessor next-batch
     :initform nil
     :type string
-    :documentation "Used on sync requests as the value of the SINCE parameter"))
+    :documentation "Used on sync requests as the value of the SINCE parameter")
+   (ssl
+    :reader ssl
+    :initform T
+    :documentation "Set to nil to use http protocol."))
   (:documentation "An instance of CLIENT holds the necessary state for
   interacting with a Matrix server. If HARDCOPY is supplied, the
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
@@ -192,7 +196,6 @@
 ;; the basic-json struct is used as a kind of default in some places
 (def-json-wrap basic-json)
 
-
 ;;; URI constants (format) strings for interacting with the Matrix API
 
 (defparameter +login-path+ "/_matrix/client/r0/login")
@@ -272,8 +275,11 @@
            ,on-ok)
          ,otherwise)))
 
-(defun make-matrix-path (client path)
-  (concatenate 'string (homeserver client) path))
+(defun make-matrix-path (client path )
+  (concatenate 'string
+               (if (ssl client) "https://" "http://")
+               (homeserver client)
+               path))
 
 ;;; API Calls
 
@@ -332,7 +338,6 @@
   (process-invited-room-events client)
   (process-account-data-events client))
 
-
 ;; The following globals are private and are recycled per call to sync
 (defvar *timeline-event* (make-timeline-event :data nil))
 (defvar *text-message-event* (make-text-message-event :data nil))
@@ -376,7 +381,6 @@
      (setf (timeline-event-data *timeline-event*) ob)
      *timeline-event*)))
 
-
 (defun process-joined-events (client)
   (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
       ;; room-id should be a string
@@ -407,7 +411,6 @@
     (setf (account-data-event-data *account-data-event*) ob)
     (handle-event client *account-data-event*)))
 
-
 (defun send-text-message (client room-id message &rest args)
   "Sends the MESSAGE (a string) to the room with id ROOM-ID. MESSAGE can also be
    a format string, and ARGS is "
@@ -415,7 +418,6 @@
         (body (list :|msgtype| "m.text"
                     :|body| (apply #'format (list* nil message args)))))
     (send (client url body :wrap make-basic-json) t)))
-
 
 (defun join-room (client room-id)
   "Attempts to join the client to the room with ROOM-ID."
@@ -427,7 +429,6 @@
                   room-id
                   *response-status*
                   (flexi-streams:octets-to-string *response-body*)))))
-
 
 (defun update-account-data (client m-type data)
   "Serializes the PLIST DATA as JSON and PUTs it in account_data at the given M-TYPE.

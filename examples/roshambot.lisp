@@ -34,7 +34,11 @@
 (defclass roshambot ()
   ((live-matches
    :accessor live-matches
-   :initform nil)))
+   :initform nil)
+   (last-matches
+    :accessor last-matches
+    :initform (make-hash-table)
+    :documentation "Hash table of (username => username) for rematch lookups.")))
 
 (defparameter +challenge-regex+
   (ppcre:create-scanner " ?i challenge ([a-zA-Z0-9_.-]+) to roshambo"
@@ -52,11 +56,21 @@
 (defun roshambo-move!? (str)
   (nth-value 0 (ppcre:scan-to-strings +roshambo-move-regex+ str)))
 
+(defparameter +rematch-regex+
+  (ppcre:create-scanner "rematch" :case-insensitive-mode t))
+
+(defun rematch!? (str)
+  (nth-value 0 (ppcre:scan-to-strings +rematch-regex+ str)))
+
 (defmethod handle-event :after ((bot roshambot) (event text-message-event))
   (let ((text (granolin:msg-body event)))
     (let-cond
       (challenged (you-wanna-piece-of-this!? text)
-                   (handle-new-challenge bot *room-id* (granolin:sender event) challenged))
+                  (handle-new-challenge bot *room-id* (granolin:sender event) challenged))
+      (rematched (rematch!? text)
+                 (handle-new-challenge bot *room-id*
+                                       (granolin:sender event)
+                                       (gethash (granolin:sender event) (last-matches bot))))
       (roshambo-match (challenger-made-move!? bot *room-id* (granolin::sender event) text)
                       (handle-match-state-change bot roshambo-match))
       (roshambo-match (challenged-made-move!? bot *room-id* (granolin::sender event) text)
@@ -108,6 +122,10 @@
                                        (readable-username loser)
                                        lose-move
                                        (readable-username winner))))
+              (setf (gethash (roshambo-match-challenger roshambo-match) (last-matches bot))
+                    (roshambo-match-challenged roshambo-match))
+              (setf (gethash (roshambo-match-challenged roshambo-match) (last-matches bot))
+                    (roshambo-match-challenger roshambo-match))
               (kill-roshambo-match bot roshambo-match))))
 
 
@@ -191,7 +209,7 @@
                                       :challenger challenger
                                       :challenger-room challenger-room
                                       :challenger-move nil
-                                      :challenged challenged 
+                                      :challenged challenged
                                       :challenged-room challenged-room
                                       :challenged-move nil)
                  (live-matches bot))

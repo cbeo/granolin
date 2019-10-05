@@ -148,6 +148,7 @@
   (event-type :|type|)
   (event-id :|event_id|)
   (sender :|sender|)
+  (event-age :|unsigned| :|age|)
   (msg-type :|content| :|msgtype|)
   (msg-body :|content| :|body|))
 

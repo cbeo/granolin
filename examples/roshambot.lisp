@@ -37,7 +37,7 @@
    :initform nil)
    (last-matches
     :accessor last-matches
-    :initform (make-hash-table)
+    :initform (make-hash-table :test 'equal)
     :documentation "Hash table of (username => username) for rematch lookups.")))
 
 (defparameter +challenge-regex+
@@ -59,22 +59,23 @@
 (defparameter +rematch-regex+
   (ppcre:create-scanner "rematch" :case-insensitive-mode t))
 
-(defun rematch!? (str)
-  (nth-value 0 (ppcre:scan-to-strings +rematch-regex+ str)))
+(defun rematch-p (str)
+  (ppcre:scan-to-strings +rematch-regex+ str))
 
 (defmethod handle-event :after ((bot roshambot) (event text-message-event))
-  (let ((text (granolin:msg-body event)))
-    (let-cond
-      (challenged (you-wanna-piece-of-this!? text)
-                  (handle-new-challenge bot *room-id* (granolin:sender event) challenged))
-      (rematched (rematch!? text)
-                 (handle-new-challenge bot *room-id*
-                                       (granolin:sender event)
-                                       (gethash (granolin:sender event) (last-matches bot))))
-      (roshambo-match (challenger-made-move!? bot *room-id* (granolin::sender event) text)
-                      (handle-match-state-change bot roshambo-match))
-      (roshambo-match (challenged-made-move!? bot *room-id* (granolin::sender event) text)
-                      (handle-match-state-change bot roshambo-match)))))
+  (when (< (event-age event) 5000)
+    (let ((text (granolin:msg-body event)))
+      (let-cond
+        (challenged (you-wanna-piece-of-this!? text)
+                    (handle-new-challenge bot *room-id* (granolin:sender event) challenged))
+        (rematched (rematch-p text)
+                   (handle-new-challenge bot *room-id*
+                                         (granolin:sender event)
+                                         (gethash (granolin:sender event) (last-matches bot))))
+        (roshambo-match (challenger-made-move!? bot *room-id* (granolin::sender event) text)
+                        (handle-match-state-change bot roshambo-match))
+        (roshambo-match (challenged-made-move!? bot *room-id* (granolin::sender event) text)
+                        (handle-match-state-change bot roshambo-match))))))
 
 (defun challenger-made-move!? (bot room-id sender text)
   (let-when (roshambo-match (find room-id (live-matches bot)

@@ -341,77 +341,83 @@
   (process-invited-room-events client)
   (process-account-data-events client))
 
-;; The following globals are private and are recycled per call to sync
-(defvar *timeline-event* (make-timeline-event :data nil))
-(defvar *text-message-event* (make-text-message-event :data nil))
-(defvar *image-message-event* (make-image-message-event :data nil))
-(defvar *audio-message-event* (make-audio-message-event :data nil))
-(defvar *file-message-event* (make-file-message-event :data nil))
-(defvar *video-message-event* (make-video-message-event :data nil))
-(defvar *emote-message-event* (make-emote-message-event :data nil))
-(defvar *notice-message-event* (make-notice-message-event :data nil))
-(defvar *location-message-event* (make-location-message-event :data nil))
-(defvar *state-event* (make-room-state-event :data nil))
-(defvar *account-data-event* (make-account-data-event :data nil))
 
-(defun categorize-and-set-timeline-event (ob)
-  (cond
-    ((text-message-event-p* ob)
-     (setf (timeline-event-data *text-message-event*) ob)
-     *text-message-event*)
-    ((image-message-event-p* ob)
-     (setf (timeline-event-data *image-message-event*) ob)
-     *image-message-event*)
-    ((audio-message-event-p* ob)
-     (setf (timeline-event-data *audio-message-event*) ob)
-     *audio-message-event*)
-    ((file-message-event-p* ob)
-     (setf (timeline-event-data *file-message-event*) ob)
-     *file-message-event*)
-    ((video-message-event-p* ob)
-     (setf (timeline-event-data *video-message-event*) ob)
-     *video-message-event*)
-    ((emote-message-event-p* ob)
-     (setf (timeline-event-data *emote-message-event*) ob)
-     *emote-message-event*)
-    ((notice-message-event-p* ob)
-     (setf (timeline-event-data *notice-message-event*) ob)
-     *notice-message-event*)
-    ((location-message-event-p* ob)
-     (setf (timeline-event-data *location-message-event*) ob)
-     *location-message-event*)
-    (t
-     (setf (timeline-event-data *timeline-event*) ob)
-     *timeline-event*)))
+;;; Event Processing and Dispatch
 
-(defun process-joined-events (client)
-  (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
-    (let ((*room-id* (symbol-name room-id))) ;; room-id should be a string
+(let ;; define some private "cache" variables to reuse
+    (( %timeline-event% (make-timeline-event :data nil))
+     ( %text-message-event% (make-text-message-event :data nil))
+     ( %image-message-event% (make-image-message-event :data nil))
+     ( %audio-message-event% (make-audio-message-event :data nil))
+     ( %file-message-event% (make-file-message-event :data nil))
+     ( %video-message-event% (make-video-message-event :data nil))
+     ( %emote-message-event% (make-emote-message-event :data nil))
+     ( %notice-message-event% (make-notice-message-event :data nil))
+     ( %location-message-event% (make-location-message-event :data nil))
+     ( %state-event% (make-room-state-event :data nil))
+     ( %account-data-event% (make-account-data-event :data nil)))
 
-      ;; handle the timeline events (aka room events)
-      (dolist (ob (getob room :|timeline| :|events|))
-        (handle-event client
-                      (categorize-and-set-timeline-event ob)))
+  (defun categorize-and-set-timeline-event (ob)
+    (cond
+      ((text-message-event-p* ob)
+       (setf (timeline-event-data %text-message-event%) ob)
+       %text-message-event%)
+      ((image-message-event-p* ob)
+       (setf (timeline-event-data %image-message-event%) ob)
+       %image-message-event%)
+      ((audio-message-event-p* ob)
+       (setf (timeline-event-data %audio-message-event%) ob)
+       %audio-message-event%)
+      ((file-message-event-p* ob)
+       (setf (timeline-event-data %file-message-event%) ob)
+       %file-message-event%)
+      ((video-message-event-p* ob)
+       (setf (timeline-event-data %video-message-event%) ob)
+       %video-message-event%)
+      ((emote-message-event-p* ob)
+       (setf (timeline-event-data %emote-message-event%) ob)
+       %emote-message-event%)
+      ((notice-message-event-p* ob)
+       (setf (timeline-event-data %notice-message-event%) ob)
+       %notice-message-event%)
+      ((location-message-event-p* ob)
+       (setf (timeline-event-data %location-message-event%) ob)
+       %location-message-event%)
+      (t
+       (setf (timeline-event-data %timeline-event%) ob)
+       %timeline-event%)))
 
-      ;; handle state chnage events (aka state events)
-      (dolist (ob (getob room :|state| :|events|))
-        (setf (room-state-event-data *state-event*) ob)
-        (handle-event client *state-event*)))))
+  (defun process-joined-events (client)
+    (loop :for (room-id room . ignore) :on (joined-rooms *response-object*) :by #'cddr :do
+      (let ((*room-id* (symbol-name room-id))) ;; room-id should be a string
 
-;; TODO add global cache variable for invite event
-(defun process-invited-room-events (client)
-  (let ((invite-event (make-invitation-event :data nil)))
-    (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
-      (let ((*room-id* (symbol-name room-id)))
+        ;; handle the timeline events (aka room events)
+        (dolist (ob (getob room :|timeline| :|events|))
+          (handle-event client
+                        (categorize-and-set-timeline-event ob)))
 
-        (dolist (ob (getob room :|invite_state| :|events|))
-          (setf (invitation-event-data invite-event) ob)
-          (handle-event client invite-event))))))
+        ;; handle state chnage events (aka state events)
+        (dolist (ob (getob room :|state| :|events|))
+          (setf (room-state-event-data %state-event%) ob)
+          (handle-event client %state-event%)))))
 
-(defun process-account-data-events (client)
-  (dolist (ob (account-data-events *response-object*))
-    (setf (account-data-event-data *account-data-event*) ob)
-    (handle-event client *account-data-event*)))
+  ;; TODO add global cache variable for invite event
+  (defun process-invited-room-events (client)
+    (let ((invite-event (make-invitation-event :data nil)))
+      (loop :for (room-id room . ignore) :on (invited-rooms *response-object*) :by #'cddr :do
+        (let ((*room-id* (symbol-name room-id)))
+
+          (dolist (ob (getob room :|invite_state| :|events|))
+            (setf (invitation-event-data invite-event) ob)
+            (handle-event client invite-event))))))
+
+  (defun process-account-data-events (client)
+    (dolist (ob (account-data-events *response-object*))
+      (setf (account-data-event-data %account-data-event%) ob)
+      (handle-event client %account-data-event%)))
+
+)
+
 
 (defun send-text-message (client room-id message &rest args)
   "Sends the MESSAGE (a string) to the room with id ROOM-ID. MESSAGE can also be

@@ -1,26 +1,21 @@
 
-(defclass shell-echo-bot (granolin:client
-                          granolin:message-log
-                          granolin:server-directory
-                          granolin::auto-joiner)
+(defpackage :shell-echo-bot
+  (:use #:cl #:granolin))
+
+(in-package :shell-echo-bot)
+
+(defclass shell-echo-bot (client
+                          message-log
+                          server-directory
+                          auto-joiner)
   ())
 
-(defvar *bot*
-  (make-instance 'shell-echo-bot
-                 :hardcopy (merge-pathnames ".shell-echo-bot.conf"
-                                            (user-homedir-pathname))
-                 :homeserver "https://matrix.hrlo.world"
-                 :output *standard-output*))
 
 
-;; a script to login if necessary, and then start the bot
-
-(unless (granolin:logged-in-p *bot*)
-  (princ "Log in to the server:")
-  (terpri)
-  (granolin:login *bot*
-                  (and (princ "username: ") (read-line))
-                  (and (princ "password: ") (read-line))))
+(defun login-and-run (user pw homeserver)
+  (let ((bot (make-instance 'shell-echo-bot :homeserver homeserver)))
+    (login bot user pw)
+    (start bot)))
 
 
-(granolin:start *bot*)
+

@@ -61,7 +61,7 @@
    (sync-state
     :accessor sync-state
     :initform nil
-    :documentation "A SYNCED-STATE object, containing deserialized JSON retruned from SYNC."))
+    :documentation "A SYNC-STATE instance, containing deserialized JSON retruned from SYNC."))
   (:documentation "An instance of CLIENT holds the necessary state for
   interacting with a Matrix server. If HARDCOPY is supplied, the
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the

@@ -58,8 +58,8 @@
     :reader ssl
     :initform T
     :documentation "Set to nil to use http protocol.")
-   (synced
-    :accessor synced
+   (sync-state
+    :accessor sync-state
     :initform nil
     :documentation "A SYNCED-STATE object, containing deserialized JSON retruned from SYNC."))
   (:documentation "An instance of CLIENT holds the necessary state for

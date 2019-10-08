@@ -57,7 +57,11 @@
    (ssl
     :reader ssl
     :initform T
-    :documentation "Set to nil to use http protocol."))
+    :documentation "Set to nil to use http protocol.")
+   (synced
+    :accessor synced
+    :initform nil
+    :documentation "A SYNCED-STATE object, containing deserialized JSON retruned from SYNC."))
   (:documentation "An instance of CLIENT holds the necessary state for
   interacting with a Matrix server. If HARDCOPY is supplied, the
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
@@ -135,7 +139,7 @@
   (user-id :|user_id|)
   (access-token :|access_token|))
 
-(def-json-wrap sync-response
+(def-json-wrap sync-state
   (next-batch :|next_batch|)
   (rooms :|rooms|)
   (presence :|presence|)
@@ -328,18 +332,24 @@
                (not full-state))
       (push (cons "since" (next-batch client))  params))
 
-    (fetch (client +sync-path+ :params params :wrap make-sync-response)
+    (fetch (client +sync-path+ :params params :wrap make-sync-state)
            (handle-sync-response client)
            (error "Matrix returned ~a from ~a"
                   *response-status* +sync-path+))))
 
 (defun handle-sync-response (client)
-  (setf (next-batch client)
-        (next-batch *response-object*))
+  (with-slots (next-batch sync-state) client
+    (setf next-batch (next-batch *response-object*))
+
+    (if sync-state
+        (setf (sync-state-data sync-state)
+              (update-json-plist (sync-state-data sync-state)
+                                 (sync-state-data *response-object*)))
+        (setf sync-state *response-object*)))
+
   (process-joined-events client)
   (process-invited-room-events client)
   (process-account-data-events client))
-
 
 ;;; Event Processing and Dispatch
 

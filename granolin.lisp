@@ -56,6 +56,7 @@
     :documentation "Used on sync requests as the value of the SINCE parameter")
    (ssl
     :reader ssl
+    :initarg :ssl
     :initform T
     :documentation "Set to nil to use http protocol."))
   (:documentation "An instance of CLIENT holds the necessary state for

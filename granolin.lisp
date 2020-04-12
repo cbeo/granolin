@@ -436,11 +436,14 @@
                     :|body| (apply #'format (list* nil message args)))))
     (send (client url body :wrap make-basic-json) t)))
 
-(defun send-image-message (client room-id alt-text mxc-uri)
+(defun send-image-message (client room-id alt-text mxc-uri
+                           &key info
+                           )
   (let ((url (format nil +text-message-path+ room-id (txn-id client)))
         (body (list :|msgtype| "m.image"
                     :|body| alt-text
                     :|url| mxc-uri
+                    :|info| info
                     )))
     (send (client url body :wrap make-basic-json) t)))
 

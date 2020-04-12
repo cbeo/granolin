@@ -219,7 +219,13 @@
             headers)
       headers))
 
-(defmacro send ((client path body &key (method :put) headers wrap)
+(defmacro send ((client path body
+                        &key
+                        (method :put)
+                        headers
+                        wrap
+                        (literal-body nil)
+                        (content-type "application/json"))
                 on-ok &optional otherwise)
   "Makes a POST request to the Matrix server and binds *RESPONSE-BODY* (a raw
   string, usually JSON formatted) *RESPONSE-STATUS* (an integer) and
@@ -239,19 +245,21 @@
   *RESPONSE-OBJECT*.
 
   When *RESPONSE-STATUS* is anything other than 200 the form in OTHERWISE is run."
-  `(multiple-value-bind
-       (*response-body* *response-status* *response-headers*)
-       (drakma:http-request (make-matrix-path ,client ,path)
-                            :additional-headers (add-auth-header ,client ,headers)
-                            :method ,method
-                            :content (jonathan:to-json ,body)
-                            :content-type "application/json")
-     (if (= 200 *response-status*)
-         (let ((*response-object*
-                 (,wrap
-                  :data (jonathan:parse (flexi-streams:octets-to-string *response-body*)))))
-           ,on-ok)
-         ,otherwise)))
+  (let ((content (if literal-body body (list 'jonathan:to-json body))))
+
+    `(multiple-value-bind
+           (*response-body* *response-status* *response-headers*)
+         (drakma:http-request (make-matrix-path ,client ,path)
+                              :additional-headers (add-auth-header ,client ,headers)
+                              :method ,method
+                              :content ,content
+                              :content-type ,content-type)
+       (if (= 200 *response-status*)
+           (let ((*response-object*
+                  (,wrap
+                   :data (jonathan:parse (flexi-streams:octets-to-string *response-body*)))))
+             ,on-ok)
+           ,otherwise))))
 
 (defmacro fetch ((client path &key params headers wrap)
                  on-ok &optional otherwise)

@@ -83,6 +83,7 @@
    #:send-text-message
    #:join-room
    #:create-direct-message-room
+   #:upload
 
    ;; bot control
    #:start

@@ -207,6 +207,7 @@
 (defparameter +text-message-path+ "/_matrix/client/r0/rooms/~a/send/m.room.message/~a")
 (defparameter +create-room-path+ "/_matrix/client/r0/createRoom")
 (defparameter +update-account-data-path+ "/_matrix/client/r0/user/~a/account_data/~a")
+(defparameter +upload-path+ "/_matrix/media/r0/upload?filename=~a")
 
 ;;; Utility functions and macros for making HTTP requests to the MATRIX API
 
@@ -443,6 +444,30 @@
           t ; do nothing in case of success
           (format *error-output* "FAILED to join room: ~a.~%HTTP response: ~a ~a~%"
                   room-id
+                  *response-status*
+                  (flexi-streams:octets-to-string *response-body*)))))
+
+(defun upload (client filename content &key (content-type "application/image"))
+  "Uploads a file to the homeserver's media storage. 
+
+   It returns the MXC URI to the uploaded content.  
+
+   FILENAME is a string passed into the query parameters of the request URI.
+
+   CONTENT can be a string, a sequence of octets, a pathname, an open
+   binary input stream, or a function designator.  It is passed
+   directly to the :content keyword parameter of
+   drakma:http-request. 
+
+   See https://edicl.github.io/drakma/#http-request for more. "
+  (let ((url (format nil +upload-path+ filename)))
+    (send (client url content
+                  :method :post
+                  :content-type content-type
+                  :wrap make-basic-json
+                  :literal-body t)
+          (getf (basic-json-data *response-object*) :|content_uri|)
+          (format *error-output* "FAILED to upload content.~%HTTP response: ~a ~a~%"
                   *response-status*
                   (flexi-streams:octets-to-string *response-body*)))))
 

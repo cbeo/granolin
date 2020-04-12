@@ -81,6 +81,7 @@
    #:login
    #:sync
    #:send-text-message
+   #:send-image-message
    #:join-room
    #:create-direct-message-room
    #:upload

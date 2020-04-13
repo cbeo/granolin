@@ -503,7 +503,8 @@
   (setf (running-p client) t)
   (unwind-protect
        (loop :while (running-p client)
-             :do (sync client))
+          :do (handler-case (sync client)
+                (error (c) (format *error-output* "error: ~a" c))))
     (clean-up client)))
 
 (defun stop (client)

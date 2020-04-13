@@ -453,7 +453,7 @@
         (url (format nil +join-room-path+ room-id)))
     (send (client url body :method :post :wrap make-basic-json)
           t ; do nothing in case of success
-          (format *error-output* "FAILED to join room: ~a.~%HTTP response: ~a ~a~%"
+          (format *error-output* "FAILED to join room: ~a.~%HTTP response: ~a ~a~%~%"
                   room-id
                   *response-status*
                   (flexi-streams:octets-to-string *response-body*)))))
@@ -476,7 +476,8 @@
                   :wrap make-basic-json
                   :literal-body t)
           (getf (basic-json-data *response-object*) :|content_uri|)
-          (format *error-output* "FAILED to upload content.~%HTTP response: ~a ~a~%"
+          (format *error-output* "FAILED to upload content: ~a.~%HTTP response: ~a ~a~%~%"
+                  filename
                   *response-status*
                   (flexi-streams:octets-to-string *response-body*)))))
 
@@ -504,7 +505,7 @@
   (unwind-protect
        (loop :while (running-p client)
           :do (handler-case (sync client)
-                (error (c) (format *error-output* "error: ~a" c))))
+                (error (c) (format *error-output* "Error during Event Sync: ~a~%~%" c))))
     (clean-up client)))
 
 (defun stop (client)

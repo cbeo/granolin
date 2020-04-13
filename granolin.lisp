@@ -42,7 +42,7 @@
    (timeout
     :accessor timeout
     :initarg :timeout
-    :initform (* 1000 10)
+    :initform (* 1000 30)
     :type integer
     :documentation "The length of time, in ms, to wait during long-polling to /sync")
    (access-token

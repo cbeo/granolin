@@ -465,10 +465,8 @@
 
    FILENAME is a string passed into the query parameters of the request URI.
 
-   CONTENT can be a string, a sequence of octets, a pathname, an open
-   binary input stream, or a function designator.  It is passed
-   directly to the :content keyword parameter of
-   drakma:http-request. 
+   CONTENT can be a string or a sequence of octets.  It is passed
+   directly to the :content keyword parameter of drakma:http-request.
 
    See https://edicl.github.io/drakma/#http-request for more. "
   (let ((url (format nil +upload-path+ filename)))

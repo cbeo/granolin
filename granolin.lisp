@@ -436,15 +436,30 @@
                     :|body| (apply #'format (list* nil message args)))))
     (send (client url body :wrap make-basic-json) t)))
 
-(defun send-image-message (client room-id alt-text mxc-uri
-                           &key info
-                           )
+(defun send-image-message (client room-id alt-text mxc-uri &key info )
+  "Sneds an m.image style message to the a room. 
+
+   See https://matrix.org/docs/spec/client_server/r0.6.0#m-image for
+   documentaiton aobut the :info argument."
   (let ((url (format nil +text-message-path+ room-id (txn-id client)))
         (body (list :|msgtype| "m.image"
                     :|body| alt-text
                     :|url| mxc-uri
                     :|info| info
                     )))
+    (send (client url body :wrap make-basic-json) t)))
+
+(defun send-video-message (client room-id alt-text mxc-uri &key info)
+  "Sends a video message to a room using the mxc-uri that should have
+  been returned from a previous upload to the server.
+
+See https://matrix.org/docs/spec/client_server/r0.6.0#m-video for
+information about the :info argument."
+  (let ((url (format nil +text-message-path+ room-id (txn-id client)))
+        (body (list :|msgtype| "m.video"
+                    :|body| alt-text
+                    :|url| mxc-uri
+                    :|info| info)))
     (send (client url body :wrap make-basic-json) t)))
 
 (defun join-room (client room-id)

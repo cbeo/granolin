@@ -82,6 +82,7 @@
    #:sync
    #:send-text-message
    #:send-image-message
+   #:send-video-message
    #:join-room
    #:create-direct-message-room
    #:upload

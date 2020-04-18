@@ -436,31 +436,91 @@
                     :|body| (apply #'format (list* nil message args)))))
     (send (client url body :wrap make-basic-json) t)))
 
-(defun send-image-message (client room-id alt-text mxc-uri &key info )
+
+(defun send-media-message (client room-id alt-text mxc-uri m-type info &optional extra)
+  "A generic send for any message typ that needs a \"url\" property in
+  the POST body. 
+
+  M-TYPE is meant to be one of m.iamge, m.video, m.audio or m.file 
+
+  INFO is meant to be a plist that will be serialized into JSON and
+  included in the POST body as the \"info\" property's value. 
+  
+  EXTRA is an optional JSON serializable PLIST that some message types
+  may need. Its key-value pairs are included in the POST body of this
+  message.
+
+  See
+  https://matrix.org/docs/spec/client_server/r0.6.0#m-room-message-msgtypes
+  for more information about message bodies. 
+  "
+
+  (let ((url (format nil +text-message-path+ room-id (txn-id client)))
+        (body (nconc (list :|msgtype| m-type
+                           :|body| alt-text
+                           :|url| mxc-uri
+                           :|info| info)
+                     extra)))
+    (send (client url body :wrap make-basic-json)
+          t
+          (format *error-output* "Error: ~a~%~a~%~%"
+                  *response-status*
+                  (flexi-streams:octets-to-string *response-body*)))))
+
+
+(defun send-image-message (client room-id alt-text mxc-uri
+                           &key info mimetype w h size)
   "Sneds an m.image style message to the a room. 
+
+   If the INFO keyword argument is non null, it is passed as the info object.
+   Otherwise, an info object is built from the remaining keyword arguments.
 
    See https://matrix.org/docs/spec/client_server/r0.6.0#m-image for
    documentaiton aobut the :info argument."
-  (let ((url (format nil +text-message-path+ room-id (txn-id client)))
-        (body (list :|msgtype| "m.image"
-                    :|body| alt-text
-                    :|url| mxc-uri
-                    :|info| info
-                    )))
-    (send (client url body :wrap make-basic-json) t)))
+  (send-media-message client room-id alt-text mxc-uri "m.image"
+                      (if info info
+                          (loop
+                             :for val :in (list mimetype w h size)
+                             :for key :in (list :|mimetype| :|w| :|h| :|size|)
+                             :when val :append (list key val)))))
 
-(defun send-video-message (client room-id alt-text mxc-uri &key info)
+(defun send-video-message (client room-id alt-text mxc-uri
+                           &key info duration w h mimetype size)
   "Sends a video message to a room using the mxc-uri that should have
   been returned from a previous upload to the server.
 
-See https://matrix.org/docs/spec/client_server/r0.6.0#m-video for
-information about the :info argument."
-  (let ((url (format nil +text-message-path+ room-id (txn-id client)))
-        (body (list :|msgtype| "m.video"
-                    :|body| alt-text
-                    :|url| mxc-uri
-                    :|info| info)))
-    (send (client url body :wrap make-basic-json) t)))
+  If the INFO keyword argument is non null, it is passed as the info object.
+  Otherwise, an info object is built from the remaining keyword arguments.
+
+
+ See https://matrix.org/docs/spec/client_server/r0.6.0#m-video for
+ information about the :info argument."
+  (send-media-message client room-id alt-text mxc-uri "m.video"
+                      (if info info
+                          (loop
+                             :for val :in (list duration w h mimetype size)
+                             :for key :in (list :|duration| :|w| :|h| :|mimetype| :|size|)
+                             :when val :append (list key val)))))
+
+(defun send-audio-message (client room-id alt-text mxc-uri
+                           &key info duration mimetype size)
+  (send-media-message client room-id alt-text mxc-uri "m.audio"
+                      (if info info
+                          (loop
+                             :for val :in (list duration mimetype size)
+                             :for key :in (list :|duration| :|mimetype| :|size|)
+                             :when val :append (list key val)))))
+
+(defun send-file-message (client room-id alt-text mxc-uri
+                          &key info (filename "") mimetype size)
+  (send-media-message client room-id alt-text mxc-uri "m.file"
+                      (if info info
+                          (loop
+                             :for val in (list mimetype size)
+                             :for key in (list :|mimetype| :|size|)
+                             :when val :append (list key val)))
+                      (list :|filename| filename)))
+
 
 (defun join-room (client room-id)
   "Attempts to join the client to the room with ROOM-ID."

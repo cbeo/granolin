@@ -254,7 +254,9 @@
                               :additional-headers (add-auth-header ,client ,headers)
                               :method ,method
                               :content ,content
-                              :content-type ,content-type)
+                              :content-type ,content-type
+                              :external-format-out :utf-8
+                              :external-format-in :utf-8)
        (if (= 200 *response-status*)
            (let ((*response-object*
                   (,wrap
@@ -279,7 +281,9 @@
          (drakma:http-request (make-matrix-path ,client ,path)
                               :additional-headers (add-auth-header ,client ,headers)
                               :parameters ,params
-                              :method :get)
+                              :method :get
+                              :external-format-out :utf-8
+                              :external-format-in :utf-8)
      (if (= 200 *response-status*)
          (let ((*response-object*
                  (,wrap
@@ -295,7 +299,7 @@
 
 ;;; API Calls
 
-(defun login (client user password)
+(defun login (client user password &key (device-name "Granolin"))
   "Logs CLIENT into its HOMESERVER withthe provided USER and PASSWORD.
 
   If successful, sets the ACCESS-TOKEN of the CLIENT. Otherwise raises an
@@ -304,7 +308,7 @@
                     :|identifier| (list :|type| "m.id.user"
                                         :|user| user)
                     :|password| password
-                    :|initial_device_display_name| "Granolin")))
+                    :|initial_device_display_name| device-name)))
 
     (send (client +login-path+ body
            :method :post

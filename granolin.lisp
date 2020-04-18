@@ -80,6 +80,7 @@
             :id-source (slot-value client 'id-source)
             :homeserver (homeserver client)
             :timeout (timeout client)
+            :user-id (user-id client)
             :access-token (access-token client)
             :next-batch (next-batch client))
            out)))
@@ -92,6 +93,7 @@
 
   (let ((conf (with-open-file (in fname) (read in))))
     (setf (slot-value client 'id-source) (getf conf :id-source))
+    (setf (slot-value client 'user-id) (getf conf :user-id))
     (setf (timeout client) (getf conf :timeout))
     (setf (access-token client) (getf conf :access-token))
     (setf (next-batch client) (getf conf :next-batch)))

@@ -199,6 +199,12 @@
 ;; the basic-json struct is used as a kind of default in some places
 (def-json-wrap basic-json)
 
+
+;;; Event Utility Functions
+(defun im-the-sender-p (client event)
+  (equal (user-id client)
+         (sender event)))
+
 ;;; URI constants (format) strings for interacting with the Matrix API
 
 (defparameter +login-path+ "/_matrix/client/r0/login")

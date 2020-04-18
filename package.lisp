@@ -70,6 +70,9 @@
    #:room-state-event
    #:invitation-event
 
+   ;; event utils
+   #:im-the-sender-p
+
    ;; generic response types
    #:basic-json
 

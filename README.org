@@ -2,7 +2,10 @@
 
 Build better bots, for matrix!
 
-For an example of a bot made with granolin, see [[https://github.com/cbeo/posterbot][posterbot]] 
+
++ Example Bots ::
+  - [[https://github.com/cbeo/posterbot][posterbot]], it posts picutres!
+  - [[https://github.com/gcentauri/snekeyes][snekeyes]], it rolls dice! 
 
 ** TODO Defing a Bot 
 

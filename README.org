@@ -4,7 +4,7 @@ Build better bots, for matrix!
 
 
 + Example Bots ::
-  - [[https://github.com/cbeo/posterbot][posterbot]], it posts picutres!
+  - [[https://github.com/cbeo/posterbot][posterbot]], it posts pictures!
   - [[https://github.com/gcentauri/snekeyes][snekeyes]], it rolls dice! 
 
 ** TODO Defing a Bot 

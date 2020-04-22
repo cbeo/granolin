@@ -6,7 +6,7 @@
   :license  "AGPLv3.0"
   :version "0.0.1"
   :serial t
-  :depends-on (#:drakma #:jonathan)
+  :depends-on (#:drakma #:jonathan #:local-time)
   :components ((:file "package")
                (:file "macros")
                (:file "utils")

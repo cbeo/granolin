@@ -592,7 +592,9 @@
   (unwind-protect
        (loop :while (running-p client)
           :do (handler-case (sync client)
-                (error (c) (format *error-output* "Error during Event Sync: ~a~%~%" c))))
+                (error (c) (format *error-output* "~a Error during Event Sync: ~a~%~%"
+                                   (local-time:now)
+                                   c))))
     (clean-up client)))
 
 (defun stop (client)

@@ -216,6 +216,7 @@
 (defparameter +create-room-path+ "/_matrix/client/r0/createRoom")
 (defparameter +update-account-data-path+ "/_matrix/client/r0/user/~a/account_data/~a")
 (defparameter +upload-path+ "/_matrix/media/r0/upload?filename=~a")
+(defparameter +user-directory-path+ "/_matrix/client/r0/user_directory/search")
 
 ;;; Utility functions and macros for making HTTP requests to the MATRIX API
 
@@ -567,6 +568,25 @@
                   filename
                   *response-status*
                   (flexi-streams:octets-to-string *response-body*)))))
+
+(defun user-search (client query &key (limit 10))
+  "QUERY is a string.  Returns a plist of the form:
+
+(:|results|
+ ((:|avatar_url| NIL :|display_name| \"bob\" :|user_id|
+   \"@bob:my.matrix.host\")
+  (:|avatar_url| NIL :|display_name| \"jill\" :|user_id|
+   \"@jill:my.matrix.host\")
+   ;; ... more ...
+   )
+ :|limited| NIL)
+ "
+  (let ((body (list :|search_term| query :|limit| limit)))
+    (send (client +user-directory-path+ body
+                  :method :post
+                  :content-type "application/json"
+                  :wrap make-basic-json)
+          (basic-json-data *response-object*) )))
 
 (defun update-account-data (client m-type data)
   "Serializes the PLIST DATA as JSON and PUTs it in account_data at the given M-TYPE.

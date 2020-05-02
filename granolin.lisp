@@ -58,11 +58,15 @@
     :reader ssl
     :initarg :ssl
     :initform T
-    :documentation "Set to nil to use http protocol."))
+    :documentation "Set to nil to use http protocol.")
+   (memory
+    :accessor memory
+    :initform nil
+    :documentation "Generic memory to store anything your bot might want to remember"))
   (:documentation "An instance of CLIENT holds the necessary state for
   interacting with a Matrix server. If HARDCOPY is supplied, the
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
-  following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH."))
+  following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH, MEMORY."))
 
 (defun logged-in-p (client)
   "T if the client has an access token."
@@ -82,7 +86,8 @@
             :timeout (timeout client)
             :user-id (user-id client)
             :access-token (access-token client)
-            :next-batch (next-batch client))
+            :next-batch (next-batch client)
+            :memory (memory client))
            out)))
 
 (defun load-client-state (client &optional fname)
@@ -96,7 +101,8 @@
     (setf (slot-value client 'user-id) (getf conf :user-id))
     (setf (timeout client) (getf conf :timeout))
     (setf (access-token client) (getf conf :access-token))
-    (setf (next-batch client) (getf conf :next-batch)))
+    (setf (next-batch client) (getf conf :next-batch))
+    (setf (memory client) (getf conf :memory)))
   client)
 
 ;; TODO

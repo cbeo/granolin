@@ -64,7 +64,7 @@
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
   following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH"))
 
-(defgeneric hardcopy-plist (bot)
+(defgeneric hardcopy-plist (client)
   (:method-combination append)
   (:documentaton "Gets a plist of slots and values to be used by
 SAVE-CLIENT-STATE when saving to hardcopy.
@@ -73,7 +73,7 @@ Each but sublcass is free to return its own specific PLIST for its own
 specific state. The PLISTS are concatenated.
 "))
 
-(defmethod hardcopy-plist ((bot client))
+(defmethod hardcopy-plist ((client client))
   (list
    'id-source (slot-value client 'id-source)
    'homeserver (homeserver client)

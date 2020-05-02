@@ -73,10 +73,6 @@ Each but sublcass is free to return its own specific PLIST for its own
 specific state. The PLISTS are concatenated.
 "))
 
-(defgeneric hardcopy-plist-keys (bot)
-  (:method-combination append)
-  (:documentation "Like HARDCOPY-PLIST but returns a list of just the keys."))
-
 (defmethod hardcopy-plist ((bot client))
   (list
    'id-source (slot-value client 'id-source)
@@ -85,9 +81,6 @@ specific state. The PLISTS are concatenated.
    'user-id (user-id client)
    'access-token (access-token client)
    'next-batch (next-batch client)))
-
-(defmethod hardcopy-plist-keys ((bot client))
-  (list 'id-source 'homeserver 'timeout 'user-id 'access-token 'next-batch))
 
 (defun logged-in-p (client)
   "T if the client has an access token."

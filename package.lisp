@@ -27,6 +27,7 @@
    ;; bot generic functions
    #:handle-event
    #:clean-up
+   #:hardcopy-plist
 
    ;; utility classes & their APIS
    #:message-log ; plugin 

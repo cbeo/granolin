@@ -33,7 +33,7 @@
    (hardcopy
     :accessor hardcopy
     :initarg :hardcopy
-    :initform nil
+    :initform #P"granolin.hardcopy"
     :type pathname
     :documentation "A file path where client state is saved.")
    (running-p
@@ -58,15 +58,36 @@
     :reader ssl
     :initarg :ssl
     :initform T
-    :documentation "Set to nil to use http protocol.")
-   (memory
-    :accessor memory
-    :initform nil
-    :documentation "Generic memory to store anything your bot might want to remember"))
+    :documentation "Set to nil to use http protocol."))
   (:documentation "An instance of CLIENT holds the necessary state for
   interacting with a Matrix server. If HARDCOPY is supplied, the
   INITIALIZE-INSTANCE :after auxilliary method will attempt to populate the
-  following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH, MEMORY."))
+  following slots from a file: HOMESERVER, TIMEOUT, ACCESS-TOKEN, NEXT-BATCH"))
+
+(defgeneric hardcopy-plist (bot)
+  (:method-combination append)
+  (:documentaton "Gets a plist of slots and values to be used by
+SAVE-CLIENT-STATE when saving to hardcopy.
+
+Each but sublcass is free to return its own specific PLIST for its own
+specific state. The PLISTS are concatenated.
+"))
+
+(defgeneric hardcopy-plist-keys (bot)
+  (:method-combination append)
+  (:documentation "Like HARDCOPY-PLIST but returns a list of just the keys."))
+
+(defmethod hardcopy-plist ((bot client))
+  (list
+   'id-source (slot-value client 'id-source)
+   'homeserver (homeserver client)
+   'timeout (timeout client)
+   'user-id (user-id client)
+   'access-token (access-token client)
+   'next-batch (next-batch client)))
+
+(defmethod hardcopy-plist-keys ((bot client))
+  (list 'id-source 'homeserver 'timeout 'user-id 'access-token 'next-batch))
 
 (defun logged-in-p (client)
   "T if the client has an access token."
@@ -80,15 +101,7 @@
     (setf fname (hardcopy client)))
 
   (with-open-file (out fname :direction :output :if-exists :supersede)
-    (print (list
-            :id-source (slot-value client 'id-source)
-            :homeserver (homeserver client)
-            :timeout (timeout client)
-            :user-id (user-id client)
-            :access-token (access-token client)
-            :next-batch (next-batch client)
-            :memory (memory client))
-           out)))
+    (print (hardcopy-plist client)  out)))
 
 (defun load-client-state (client &optional fname)
   "Load client state from a PLIST stored in a file."
@@ -97,12 +110,8 @@
     (setf fname (hardcopy client)))
 
   (let ((conf (with-open-file (in fname) (read in))))
-    (setf (slot-value client 'id-source) (getf conf :id-source))
-    (setf (slot-value client 'user-id) (getf conf :user-id))
-    (setf (timeout client) (getf conf :timeout))
-    (setf (access-token client) (getf conf :access-token))
-    (setf (next-batch client) (getf conf :next-batch))
-    (setf (memory client) (getf conf :memory)))
+    (loop :for (key val . more) :on conf :by #'cddr
+         :do (setf slot-value client key) val))
   client)
 
 ;; TODO

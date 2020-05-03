@@ -66,7 +66,7 @@
 
 (defgeneric hardcopy-plist (client)
   (:method-combination append)
-  (:documentaton "Gets a plist of slots and values to be used by
+  (:documentation "Gets a plist of slots and values to be used by
 SAVE-CLIENT-STATE when saving to hardcopy.
 
 Each but sublcass is free to return its own specific PLIST for its own
@@ -104,7 +104,7 @@ specific state. The PLISTS are concatenated.
 
   (let ((conf (with-open-file (in fname) (read in))))
     (loop :for (key val . more) :on conf :by #'cddr
-         :do (setf slot-value client key) val))
+       :do (setf (slot-value client key) val)))
   client)
 
 ;; TODO

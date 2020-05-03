@@ -73,7 +73,7 @@ Each but sublcass is free to return its own specific PLIST for its own
 specific state. The PLISTS are concatenated.
 "))
 
-(defmethod hardcopy-plist ((client client))
+(defmethod hardcopy-plist append ((client client))
   (list
    'id-source (slot-value client 'id-source)
    'homeserver (homeserver client)
